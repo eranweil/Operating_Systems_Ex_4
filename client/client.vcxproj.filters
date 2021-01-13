@@ -14,10 +14,10 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="Shared Header Files">
-      <UniqueIdentifier>{2dc77108-be97-4fe4-b69a-5941eeb86ae1}</UniqueIdentifier>
+      <UniqueIdentifier>{b1fbebad-7efd-4514-9a04-e905323f55f5}</UniqueIdentifier>
     </Filter>
     <Filter Include="Shared Source Files">
-      <UniqueIdentifier>{55340cc3-21e9-4dd6-a07a-7cc6fc8aa4cc}</UniqueIdentifier>
+      <UniqueIdentifier>{6434a2ea-1782-4e1e-b51b-4ed9ed9923df}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
