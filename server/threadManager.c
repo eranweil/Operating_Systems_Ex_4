@@ -25,18 +25,7 @@ PARAMETERS -    wait_res - the result of waiting on the sync element
 
 RETURN - void
     --------------------------------------------------------------------------------------------*/
-void WaitError(DWORD wait_res, int thread_num);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - A function to break an integer into primes
-
-PARAMETERS -    n - The integer to be broken down to primes
-                p_prime_numbers - a pointer to an array of integers where the primes will be stored
-                p_prime_numbers_size - a pointer to an outside variable where we get the number of primes. Will be updated in function for use of the calling function
-
-RETURN - a pointer to an array of integers where the primes are stored
-    --------------------------------------------------------------------------------------------*/
-int* break_into_primes(int n, int* p_prime_numbers, int* p_prime_numbers_size);
+void WaitError(DWORD wait_res);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Calls a wait for multiple objects on an array with all of the running threads
@@ -61,7 +50,14 @@ PARAMETERS - p_threads - a pointer to an array of handles holding all of the thr
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int dispatch_threads(HANDLE* p_threads, LOCK* p_lock, QUEUE* p_queue, int number_of_threads, int* p_number_of_tasks, HANDLE* start_line_sephamore, char* tasks_file_name);
+int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock);
+
+
+int WhatWasReceived(char* AcceptedStr);
+
+
+void DefineStringToSend(THREAD* thread_params, char string_received[], char string_to_send[]);
+
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
@@ -70,169 +66,149 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI thread_main(LPVOID lpParam);
+DWORD WINAPI RecvDataThread(LPVOID lpParam);
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
+
+PARAMETERS - lpParam: holds the data structure of pData for that thread
+
+RETURN - signal exit code.
+    --------------------------------------------------------------------------------------------*/
+DWORD WINAPI SendDataThread(LPVOID lpParam);
 
 //---------------------------------------------------------------//
 // ------------------------IMPLEMENTAIONS------------------------//
 //---------------------------------------------------------------//
 
-void WaitError(DWORD wait_res, int thread_num)
+
+void WaitError(DWORD wait_res)
 {
-    printf("When executing thread number %d ", thread_num);
     switch (wait_res)
     {
-        case WAIT_ABANDONED:
-        {
-            printf("there was an abandoned sync element\n");
-            break;
-        }
-        case WAIT_TIMEOUT:
-        {
-            printf("there was a sync element for which we waited too long\n");
-            break;
-        }
-        case WAIT_FAILED:
-        {
-            printf("there was a failed sync element\n");
-            break;
-        }
-        default:
-        {
-            printf("there was an unrecognized sync element issue\n");
-            break;
-        }
+    case WAIT_ABANDONED:
+    {
+        printf("there was an abandoned sync element\n");
+        break;
+    }
+    case WAIT_TIMEOUT:
+    {
+        printf("there was a sync element for which we waited too long\n");
+        break;
+    }
+    case WAIT_FAILED:
+    {
+        printf("there was a failed sync element\n");
+        break;
+    }
+    default:
+    {
+        printf("there was an unrecognized sync element issue\n");
+        break;
+    }
     }
 }
 
-int* break_into_primes(int n, int* p_prime_numbers, int* p_prime_numbers_size)
-{
-    size_t prime_numbers_index = *p_prime_numbers_size;
-    int prime_number = n;
-    int i = 3;
-    if (NULL == (p_prime_numbers = (int*)malloc(prime_numbers_index * sizeof(int)))) return p_prime_numbers;
 
-    while ((prime_number % 2) == 0)
-    {
-        *(p_prime_numbers + prime_numbers_index - 1) = 2;
-        prime_number = prime_number / 2;
-        printf("Number %d of prime %d is %d\n", prime_numbers_index, n, 2);
-        prime_numbers_index++;
-        if (NULL == (p_prime_numbers = (int*)realloc(p_prime_numbers, prime_numbers_index * sizeof(int)))) return p_prime_numbers;
-    }
-
-    while (i <= sqrt(prime_number))
-    {
-        while ((prime_number % i) == 0)
-        {
-            *(p_prime_numbers + prime_numbers_index - 1) = i;
-            prime_number = prime_number / i;
-            printf("Number %d of prime %d is %d\n", prime_numbers_index, n, i);
-            prime_numbers_index++;
-            if (NULL == (p_prime_numbers = (int*)realloc(p_prime_numbers, prime_numbers_index * sizeof(int)))) return p_prime_numbers;
-        }
-        i = i + 2;
-    }
-
-    if (prime_number > 2)
-    {
-        *(p_prime_numbers + prime_numbers_index - 1) = prime_number;
-        printf("Number %d of prime %d is %d\n", prime_numbers_index, n, prime_number);
-    }
-    else prime_numbers_index--;
-    *p_prime_numbers_size = prime_numbers_index;
-    return p_prime_numbers;
-}
-
-int wait_for_threads_execution_and_free(HANDLE* p_threads, int number_of_threads)
+int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
 {
     int i = 0;
     DWORD dwEvent;
 
-    dwEvent = WaitForMultipleObjects(
-        number_of_threads,                                          // number of objects in array
-        p_threads,                                                  // array of objects
-        TRUE,                                                       // wait for all object
-        10 * number_of_threads * THREAD_WAIT_TIME);                 // long wait period for all threads
-    
-    if (WAIT_OBJECT_0 != dwEvent)
+    dwEvent = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
+
+    if (WAIT_OBJECT_0 == dwEvent)
+    {
+        // Free the threads which were dispatched
+        for (i = 0; i < 2; i++)
+        {
+            CloseHandle(hThread[i]);
+            printf("freed Thread number: %d\n", i + 1);
+        }
+    }
+
+    else
     {
         // Print Error message
-        WaitError(dwEvent, 0); 
+        WaitError(dwEvent, 0);
         // Free the threads which were dispatched, because some might have been
-        for (i = 0; i < number_of_threads; i++)
+        for (i = 0; i < 2; i++)
         {
-            if (NULL != (p_threads + i))
+            if (hThread[i] != NULL)
             {
-                CloseHandle(*(p_threads + i));
+                CloseHandle(hThread[i]);
                 printf("freed Thread number: %d\n", i + 1);
             }
         }
-        return STATUS_CODE_FAILURE;
     }
-    // Close event handles in the event of a total success
-    for (i = 0; i < number_of_threads; i++)
-    {
-        CloseHandle(*(p_threads + i));
-        printf("freed Thread number: %d\n", i + 1);
-    }
-    return SUCCESS_CODE;
+
+    closesocket(*m_socket);
+    WSACleanup();
 }
 
-int dispatch_threads(HANDLE* p_threads, LOCK* p_lock, QUEUE* p_queue, int number_of_threads, int* p_number_of_tasks, HANDLE* p_start_line_sephamore, char* tasks_file_name)
+
+int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock)
 {
     int i = 0, j = 0;
 
     THREAD Data;
     THREAD* pData = &Data;
-    DWORD dwThreadId;
-
+    DWORD dwThreadId_receive;
+    DWORD dwThreadId_send;
 
     pData->p_lock = p_lock;
-    pData->p_queue = p_queue;
-    pData->p_number_of_tasks = p_number_of_tasks;
-    pData->start_line_sephamore = p_start_line_sephamore;
-    pData->tasks_file_name = tasks_file_name;
+    //pData->start_line_sephamore = p_start_line_sephamore;
+    pData->m_socket = m_socket;
+    *pData->receive_thread_result = -1;
 
-    // continue dispatching threads until 0 threads are needed
-    for (i = 0; i < number_of_threads; i++)
+    hThread[0] = CreateThread(
+        NULL,
+        0,
+        SendDataThread,
+        pData,
+        0,
+        &dwThreadId_send
+    );
+
+    //In case of error
+    if (NULL == hThread[0])
     {
-        pData->thread_number = i + 1;
-
-        // create thread
-        *(p_threads + i) = CreateThread(
-            NULL,                                           // default security attributes
-            0,                                              // use default stack size  
-            thread_main,                                    // thread function name
-            pData,                                          // argument to thread function 
-            0,                                              // use default creation flags 
-            &dwThreadId);                                   // returns the thread identifier 
-
-        //In case of error
-        if (NULL == *(p_threads + i))
-        {
-            printf("Brutally terminating the program due to thread dispatch issues");
-            //When one thread doesn't succeed free all those that did before it
-            for (j = 0; j < i; j++)
-            {
-                CloseHandle(*(p_threads + j));
-            }
-            return STATUS_CODE_FAILURE;
-        }
-        //Else
-        printf("dispatched Thread number: %d\n", i + 1);
-
-    }
-
-    // Release start line Sephamore
-    if (FALSE == (ReleaseSemaphore(*p_start_line_sephamore, number_of_threads, NULL)))
-    {
-        printf("Couldn't release start line semaphore");
+        printf("Brutally terminating the program due to thread dispatch issues");
+        CloseHandle(hThread[0]);
         return STATUS_CODE_FAILURE;
     }
-    printf("start line semaphore released\n");
+    //Else
+    printf("dispatched sending Thread\n");
+
+    hThread[1] = CreateThread(
+        NULL,
+        0,
+        RecvDataThread,
+        pData,
+        0,
+        &dwThreadId_receive
+    );
+
+    //In case of error
+    if (NULL == hThread[1])
+    {
+        printf("Brutally terminating the program due to thread dispatch issues");
+        CloseHandle(hThread[1]);
+        return STATUS_CODE_FAILURE;
+    }
+    //Else
+    printf("dispatched receiving Thread\n");
+
+    //// Release start line Sephamore
+    //if (FALSE == (ReleaseSemaphore(*p_start_line_sephamore, number_of_threads, NULL)))
+    //{
+    //    printf("Couldn't release start line semaphore");
+    //    return STATUS_CODE_FAILURE;
+    //}
+    //printf("start line semaphore released\n");
 
     // escorting the threads for exit
-    if (STATUS_CODE_FAILURE == (wait_for_threads_execution_and_free(p_threads, number_of_threads)))
+    if (STATUS_CODE_FAILURE == (wait_for_threads_execution_and_free(hThread, m_socket)))
     {
         printf("There was a wait error while we waited for all of the threads");
         return STATUS_CODE_FAILURE;
@@ -243,68 +219,102 @@ int dispatch_threads(HANDLE* p_threads, LOCK* p_lock, QUEUE* p_queue, int number
     return SUCCESS_CODE;
 }
 
-DWORD WINAPI thread_main(LPVOID lpParam)
+
+int WhatWasReceived(char* AcceptedStr)
 {
-    
+    if (0 == strcmp(AcceptedStr, "SERVER_MAIN_MENU\n")) return SERVER_MAIN_MENU;
+    if (0 == strcmp(AcceptedStr, "SERVER_APPROVED\n")) return SERVER_APPROVED;
+    if (0 == strcmp(AcceptedStr, "SERVER_INVITE\n")) return SERVER_INVITE;
+    if (0 == strcmp(AcceptedStr, "SERVER_SETUP_REQUEST\n")) return SERVER_SETUP_REQUEST;
+    if (0 == strcmp(AcceptedStr, "SERVER_PLAYER_MOVE_REQUEST\n")) return SERVER_PLAYER_MOVE_REQUEST;
+    if (0 == strcmp(AcceptedStr, "SERVER_GAME_RESULTS\n")) return SERVER_GAME_RESULTS;
+    if (0 == strcmp(AcceptedStr, "SERVER_WIN\n")) return SERVER_WIN;
+    if (0 == strcmp(AcceptedStr, "SERVER_DRAW\n")) return SERVER_DRAW;
+    if (0 == strcmp(AcceptedStr, "SERVER_NO_OPPONENTS\n")) return SERVER_NO_OPPONENTS;
+    if (0 == strcmp(AcceptedStr, "SERVER_OPPONENT_QUIT\n")) return SERVER_OPPONENT_QUIT;
+    //if (0 == strcmp(AcceptedStr, "SERVER_DENIED\n")) return SERVER_DENIED;
+
+    // Upon failure
+    return STATUS_CODE_FAILURE;
+}
+
+
+void DefineStringToSend(THREAD* thread_params, char string_received[], char string_to_send[])
+{
+    //now to define strings to send
+    return;
+}
+
+
+DWORD WINAPI RecvDataThread(LPVOID lpParam)
+{
+
+    TransferResult_t RecvRes;
+    THREAD* thread_params = (THREAD*)lpParam;
     DWORD wait_res;
     BOOL release_res;
-    THREAD* thread_params = (THREAD*)lpParam;
-    int curr_task_num = 0, n = 0, number_of_digits = 0, prime_numbers_size = 1, thread_num = thread_params->thread_number;
-    int* p_prime_numbers = NULL;
-    int* p_number_of_digits = &number_of_digits, p_prime_numbers_size = &prime_numbers_size;
-    char* line = NULL;
 
-    // Wait at the starting line for all threads to be created
-    if (WAIT_OBJECT_0 != (wait_res = (WaitForSingleObject(*(thread_params->start_line_sephamore), thread_params->p_lock->number_of_threads * THREAD_WAIT_TIME))))
+    while (1)
     {
-        WaitError(wait_res, thread_num);
-        return STATUS_CODE_FAILURE;
-    }
+        char* AcceptedStr = NULL;
+        RecvRes = ReceiveString(&AcceptedStr, (*thread_params->m_socket));
 
-    // Run as long as there are more tasks left
-    while ((*(thread_params->p_number_of_tasks)) > 0)
-    {
-        p_prime_numbers = NULL;
-
-        // Get the next prioritized task
-        if (WAIT_OBJECT_0 != (wait_res = (queue_lock(thread_params->p_lock))))
+        if (RecvRes == TRNS_FAILED)
         {
-            WaitError(wait_res, thread_num);
-            return STATUS_CODE_FAILURE;
+            printf("Socket error while trying to read data from socket\n");
+            return 0x555;
         }
-        curr_task_num = Pop(thread_params->p_queue)->priority;
-        *(thread_params->p_number_of_tasks) -= 1;
-        if (FALSE == (release_res = queue_release(thread_params->p_lock))) return STATUS_CODE_FAILURE;
-        printf("Thread %d finished with the queue\n", thread_num);
-
-        // Get the task
-        if (WAIT_OBJECT_0 != (wait_res = (read_lock(thread_params->p_lock))))
+        else if (RecvRes == TRNS_DISCONNECTED)
         {
-            WaitError(wait_res, thread_num);
-            return STATUS_CODE_FAILURE;
+            printf("Server closed connection. Bye!\n");
+            return 0x555;
         }
-        if (STATUS_CODE_FAILURE == (n = GetTask(thread_params->tasks_file_name, curr_task_num, p_number_of_digits))) return STATUS_CODE_FAILURE;
-        if (FALSE == (release_res = read_release(thread_params->p_lock))) return STATUS_CODE_FAILURE;
-        printf("Thread %d finished reading task number: %d\n", thread_num, *(thread_params->p_number_of_tasks));
-
-        // Calculate the prime numbers
-        if (NULL == (p_prime_numbers = break_into_primes(n, p_prime_numbers, p_prime_numbers_size))) return STATUS_CODE_FAILURE;
-        printf("Thread %d broke into primes\n", thread_num);
-
-        // Write to the file
-        if (WAIT_OBJECT_0 != (wait_res = (write_lock(thread_params->p_lock))))
+        else
         {
-            WaitError(wait_res, thread_num);
-            return STATUS_CODE_FAILURE;
+            *thread_params->receive_thread_result = WhatWasReceived(AcceptedStr);
         }
-        print_primes_to_file(thread_params->tasks_file_name, p_prime_numbers, prime_numbers_size, n, number_of_digits);
-        if (FALSE == (release_res = write_release(thread_params->p_lock))) return STATUS_CODE_FAILURE;
-        p_prime_numbers = NULL;
-        prime_numbers_size = 1;
-        number_of_digits = 0;
-        printf("Thread %d finished writing task number: %d\n", thread_num, *(thread_params->p_number_of_tasks));
-        free(p_prime_numbers);
+
+        free(AcceptedStr);
     }
 
     return SUCCESS_CODE;
 }
+
+
+DWORD WINAPI SendDataThread(LPVOID lpParam)
+{
+
+    char    client_request_str[37],
+        client_versus_str[] = "CLIENT_VERSUS\n",
+        client_setup_str[19],
+        client_player_move_str[25],
+        client_disconnect_str[] = "CLIENT_DISCONNECT\n";
+
+    TransferResult_t SendRes;
+    THREAD* thread_params = (THREAD*)lpParam;
+    DWORD wait_res;
+    BOOL release_res;
+
+    char string_received[5] = NULL;
+    char string_to_send[37] = NULL;
+
+    while (1)
+    {
+        gets_s(string_received, 5); //Reading a string from the keyboard
+
+        if (strcmp(string_received, "2"))
+            return 0x555; //"quit" signals an exit from the client side
+
+        DefineStringToSend(thread_params, string_received, string_to_send);
+
+        SendRes = SendString(string_to_send, (*thread_params->m_socket));
+
+        if (SendRes == TRNS_FAILED)
+        {
+            printf("Socket error while trying to write data to socket\n");
+            return 0x555;
+        }
+    }
+}
+
+

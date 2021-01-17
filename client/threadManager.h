@@ -73,7 +73,19 @@ int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock);
 int WhatWasReceived(char* AcceptedStr);
 
 
-void DefineStringToSend(THREAD* thread_params, char string_received[], char string_to_send[]);
+void OpponentNameLenInBytes(char received_string[], int* p_opponent_name_len);
+
+
+void BreakDownGameResultsString(char received_string[], char bulls[], char cows[], char opponent_username[], char opponent_guess[], int opponent_name_len);
+
+
+void GetWinnersNameAndOpponentsGuess(char received_string[], char winners_name[], char opponent_guess[]);
+
+
+char* GetStringFromClient(char user_input[]);
+
+
+void DefineStringToSend(int game_state, char user_input[], char send_string[]);
 
 
 /*--------------------------------------------------------------------------------------------
@@ -83,7 +95,7 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI RecvDataThread(LPVOID lpParam);
+DWORD WINAPI RecvData(SOCKET* m_socket, char received_string[]);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
@@ -92,4 +104,4 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI SendDataThread(LPVOID lpParam);
+DWORD WINAPI SendData(SOCKET* m_socket, char send_string[]);

@@ -9,9 +9,13 @@ All thread related actions header file
 // --------------------------INCLUDE-------------------------- //
 //-------------------------------------------------------------//
 
+#include <string.h>
+#include <winsock2.h>
 #include <Windows.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
+#include <stdbool.h>
 #include <math.h>
 
 //-------------------------------------------------------------//
@@ -41,17 +45,6 @@ RETURN - void
 void WaitError(DWORD wait_res, int thread_num);
 
 /*--------------------------------------------------------------------------------------------
-DESCRIPTION - A function to break an integer into primes
-
-PARAMETERS -    n - The integer to be broken down to primes
-                p_prime_numbers - a pointer to an array of integers where the primes will be stored
-                p_prime_numbers_size - a pointer to an outside variable where we get the number of primes. Will be updated in function for use of the calling function
-
-RETURN - a pointer to an array of integers where the primes are stored
-    --------------------------------------------------------------------------------------------*/
-int* break_into_primes(int n, int* p_prime_numbers, int* p_prime_numbers_size);
-
-/*--------------------------------------------------------------------------------------------
 DESCRIPTION - Calls a wait for multiple objects on an array with all of the running threads
 
 PARAMETERS - p_threads - an array of thread handles
@@ -74,7 +67,14 @@ PARAMETERS - p_threads - a pointer to an array of handles holding all of the thr
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int dispatch_threads(HANDLE* p_threads, LOCK* p_lock, QUEUE* p_queue, int number_of_threads, int* p_number_of_tasks, HANDLE* start_line_sephamore, char* tasks_file_name);
+int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock);
+
+
+int WhatWasReceived(char* AcceptedStr);
+
+
+void DefineStringToSend(THREAD* thread_params, char string_received[], char string_to_send[]);
+
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
@@ -83,4 +83,13 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI thread_main(LPVOID lpParam);
+DWORD WINAPI RecvDataThread(LPVOID lpParam);
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
+
+PARAMETERS - lpParam: holds the data structure of pData for that thread
+
+RETURN - signal exit code.
+    --------------------------------------------------------------------------------------------*/
+DWORD WINAPI SendDataThread(LPVOID lpParam);
