@@ -10,6 +10,8 @@
 #include "SocketSendRecvTools.h"
 #include <stdio.h>
 #include <string.h>
+#include "HardCodedData.h"
+
 
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
@@ -93,21 +95,12 @@ TransferResult_t ReceiveBuffer( char* OutputBuffer, int BytesToReceive, SOCKET s
 
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
-TransferResult_t ReceiveString( char** OutputStrPtr, SOCKET sd )
+TransferResult_t ReceiveString(char received_string[], SOCKET sd )
 {
 	/* Recv the the request to the server on socket sd */
 	int TotalStringSizeInBytes;
 	TransferResult_t RecvRes;
 	char* StrBuffer = NULL;
-
-	if ( ( OutputStrPtr == NULL ) || ( *OutputStrPtr != NULL ) )
-	{
-		printf("The first input to ReceiveString() must be " 
-			   "a pointer to a char pointer that is initialized to NULL. For example:\n"
-			   "\tchar* Buffer = NULL;\n"
-			   "\tReceiveString( &Buffer, ___ )\n" );
-		return TRNS_FAILED;
-	}
 
 	/* The request is received in two parts. First the Length of the string (stored in 
 	   an int variable ), then the string itself. */
@@ -129,12 +122,9 @@ TransferResult_t ReceiveString( char** OutputStrPtr, SOCKET sd )
 		(int)( TotalStringSizeInBytes), 
 		sd );
 
-	if ( RecvRes == TRNS_SUCCEEDED ) 
-		{ *OutputStrPtr = StrBuffer; }
-	else
-	{
-		free( StrBuffer );
-	}
+	if (RecvRes == TRNS_SUCCEEDED) strcpy_s(received_string, MAX_BYTES_SERVER_MIGHT_SEND, StrBuffer);
+
+	free( StrBuffer );
 		
 	return RecvRes;
 }

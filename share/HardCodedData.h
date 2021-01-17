@@ -60,7 +60,14 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define SERVER_DRAW                             7
 #define SERVER_NO_OPPONENTS                     8
 #define SERVER_OPPONENT_QUIT                    9
-#define SERVER_DENIED_1                         10
+#define SERVER_DENIED                           10
+#define MAX_BYTES_SERVER_MIGHT_SEND             66
+
+// Personal client codes
+#define I_START                                 -1
+#define I_QUIT                                  -2
+#define I_FAIL                                  -3
+
 
 // Structures
 struct lock
