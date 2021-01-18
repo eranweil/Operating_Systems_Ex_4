@@ -11,7 +11,9 @@
 #define SOCKET_SEND_RECV_TOOLS_H
 
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
-
+#include <stdio.h>
+#include <string.h>
+#include "HardCodedData.h"
 #include <winsock2.h>
 #pragma comment(lib, "ws2_32.lib")
 
@@ -84,5 +86,25 @@ TransferResult_t ReceiveString( char** OutputStrPtr, SOCKET sd );
 
 
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
+
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
+
+PARAMETERS - lpParam: holds the data structure of pData for that thread
+
+RETURN - signal exit code.
+    --------------------------------------------------------------------------------------------*/
+DWORD WINAPI RecvData(SOCKET* m_socket, char received_string[]);
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
+
+PARAMETERS - lpParam: holds the data structure of pData for that thread
+
+RETURN - signal exit code.
+    --------------------------------------------------------------------------------------------*/
+DWORD WINAPI SendData(SOCKET* m_socket, char send_string[]);
+
 
 #endif // SOCKET_SEND_RECV_TOOLS_H

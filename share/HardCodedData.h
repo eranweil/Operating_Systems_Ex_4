@@ -49,6 +49,11 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define CLIENT_PLAYER_MOVE                      3
 #define CLIENT_DISCONNECT                       4
 
+// Personal client codes
+#define I_START                                 21
+#define I_QUIT                                  22
+#define I_FAIL                                  23
+
 // Server codes
 #define SERVER_MAIN_MENU                        0
 #define SERVER_APPROVED                         1
@@ -61,32 +66,32 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define SERVER_NO_OPPONENTS                     8
 #define SERVER_OPPONENT_QUIT                    9
 #define SERVER_DENIED                           10
-#define MAX_BYTES_SERVER_MIGHT_SEND             66
 
-// Personal client codes
-#define I_START                                 -1
-#define I_QUIT                                  -2
-#define I_FAIL                                  -3
+// Constants
+#define SERVER_ADDRESS_STR                      "127.0.0.1"
+#define NUM_OF_WORKER_THREADS                   2
+#define MAX_LOOPS                               3
+#define MAX_BYTES_SERVER_MIGHT_SEND             66
+#define MAX_BYTES_CLIENT_MIGHT_SEND             27         
+#define THREAD_WAIT_TIME                        15000
 
 
 // Structures
 struct lock
 {
-    int number_of_threads;
-    int* p_reader_counter;
     HANDLE* p_mutex_file;
-    HANDLE* p_sephamore_file;
-    HANDLE* p_turnstile;
-    HANDLE* p_queue_lock;
+    HANDLE* p_event;
 };
 typedef struct lock LOCK;
 
 struct Thread
 {
-    SOCKET*	m_socket;
-    LOCK* p_lock;
-    int* receive_thread_result;
-    //HANDLE* start_line_sephamore;
+    SOCKET* ThreadInputs;
+    HANDLE* p_mutex_file;
+    HANDLE* p_event;
+    char* tasks_file_name;
+    int thread_id;
+    int* stage_of_game;
 };
 typedef struct Thread THREAD;
 

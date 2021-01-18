@@ -52,30 +52,12 @@ PARAMETERS - p_threads - an array of thread handles
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int wait_for_threads_execution_and_free(HANDLE* p_threads, int number_of_threads);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - the mother function which dispatches the threads and waits for them to finish their good work.
-
-PARAMETERS - p_threads - a pointer to an array of handles holding all of the thread handles
-             p_lock - a pointer to the joint lock element
-             p_queue - a pointer to the joint queue element
-             number_of_threads - the number of threads specified by the user
-             p_number_of_tasks - a pointer to an integer with the number of tasks left. each thread is responsible to update it
-             start_line_sephamore - this is a joint semaphore used to send all of the threads on their way simultaneously
-             tasks_file_name - the name of the tasks file
-
-RETURN - success code upon success or failure code otherwise
-    --------------------------------------------------------------------------------------------*/
-int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock);
+int wait_for_threads_execution_and_free(HANDLE ThreadHandles[], SOCKET ThreadInputs[]);
 
 
 int WhatWasReceived(char* AcceptedStr);
 
 
-void DefineStringToSend(THREAD* thread_params, char string_received[], char string_to_send[]);
-
-
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
 
@@ -83,13 +65,5 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI RecvDataThread(LPVOID lpParam);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
-
-PARAMETERS - lpParam: holds the data structure of pData for that thread
-
-RETURN - signal exit code.
-    --------------------------------------------------------------------------------------------*/
-DWORD WINAPI SendDataThread(LPVOID lpParam);
+DWORD WINAPI ServiceThread(LPVOID lpParam);
+d(LPVOID lpParam);

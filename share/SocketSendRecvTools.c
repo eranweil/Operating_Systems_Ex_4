@@ -8,9 +8,6 @@
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
 #include "SocketSendRecvTools.h"
-#include <stdio.h>
-#include <string.h>
-#include "HardCodedData.h"
 
 
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
@@ -128,3 +125,60 @@ TransferResult_t ReceiveString(char received_string[], SOCKET sd )
 		
 	return RecvRes;
 }
+
+
+
+DWORD WINAPI RecvData(SOCKET* m_socket, char received_string[])
+{
+
+	TransferResult_t RecvRes;
+	DWORD wait_res;
+	BOOL release_res;
+
+	while (1)
+	{
+		RecvRes = ReceiveString(received_string, *m_socket);
+
+		if (RecvRes == TRNS_FAILED)
+		{
+			printf("Socket error while trying to read data from socket\n");
+			return 0x555;
+		}
+		else if (RecvRes == TRNS_DISCONNECTED)
+		{
+			printf("Server closed connection. Bye!\n");
+			return 0x555;
+		}
+		else
+		{
+			return SUCCESS_CODE;
+		}
+	}
+
+}
+
+
+DWORD WINAPI SendData(SOCKET* m_socket, char send_string[])
+{
+
+	TransferResult_t SendRes;
+	DWORD wait_res;
+	BOOL release_res;
+
+	char string_received[5] = NULL;
+	char string_to_send[37] = NULL;
+
+	while (1)
+	{
+
+		SendRes = SendString(send_string, *m_socket);
+
+		if (SendRes == TRNS_FAILED)
+		{
+			printf("Socket error while trying to write data to socket\n");
+			return 0x555;
+		}
+	}
+}
+
+

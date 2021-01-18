@@ -35,30 +35,11 @@ PARAMETERS - p_threads - an array of thread handles
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int wait_for_threads_execution_and_free(HANDLE* p_threads, int number_of_threads);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - the mother function which dispatches the threads and waits for them to finish their good work.
-
-PARAMETERS - p_threads - a pointer to an array of handles holding all of the thread handles
-             p_lock - a pointer to the joint lock element
-             p_queue - a pointer to the joint queue element
-             number_of_threads - the number of threads specified by the user
-             p_number_of_tasks - a pointer to an integer with the number of tasks left. each thread is responsible to update it
-             start_line_sephamore - this is a joint semaphore used to send all of the threads on their way simultaneously
-             tasks_file_name - the name of the tasks file
-
-RETURN - success code upon success or failure code otherwise
-    --------------------------------------------------------------------------------------------*/
-int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock);
+int wait_for_threads_execution_and_free(HANDLE ThreadHandles[], SOCKET ThreadInputs[]);
 
 
 int WhatWasReceived(char* AcceptedStr);
 
-
-void DefineStringToSend(THREAD* thread_params, char string_received[], char string_to_send[]);
-
-
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
 
@@ -66,16 +47,8 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI RecvDataThread(LPVOID lpParam);
+DWORD WINAPI ServiceThread(LPVOID lpParam);
 
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
-
-PARAMETERS - lpParam: holds the data structure of pData for that thread
-
-RETURN - signal exit code.
-    --------------------------------------------------------------------------------------------*/
-DWORD WINAPI SendDataThread(LPVOID lpParam);
 
 //---------------------------------------------------------------//
 // ------------------------IMPLEMENTAIONS------------------------//
@@ -110,19 +83,20 @@ void WaitError(DWORD wait_res)
 }
 
 
-int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
+int wait_for_threads_execution_and_free(HANDLE ThreadHandles[], SOCKET ThreadInputs[])
 {
     int i = 0;
     DWORD dwEvent;
 
-    dwEvent = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
+    dwEvent = WaitForMultipleObjects(2, ThreadHandles, FALSE, INFINITE);
 
     if (WAIT_OBJECT_0 == dwEvent)
     {
         // Free the threads which were dispatched
-        for (i = 0; i < 2; i++)
+        for (i = 0; i < NUM_OF_WORKER_THREADS; i++)
         {
-            CloseHandle(hThread[i]);
+            CloseHandle(ThreadHandles[i]);
+            closesocket(ThreadInputs[i]);
             printf("freed Thread number: %d\n", i + 1);
         }
     }
@@ -134,187 +108,348 @@ int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
         // Free the threads which were dispatched, because some might have been
         for (i = 0; i < 2; i++)
         {
-            if (hThread[i] != NULL)
+            if (ThreadHandles[i] != NULL)
             {
-                CloseHandle(hThread[i]);
+                CloseHandle(ThreadHandles[i]);
+                closesocket(ThreadInputs[i]);
                 printf("freed Thread number: %d\n", i + 1);
             }
         }
     }
 
-    closesocket(*m_socket);
-    WSACleanup();
-}
-
-
-int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock)
-{
-    int i = 0, j = 0;
-
-    THREAD Data;
-    THREAD* pData = &Data;
-    DWORD dwThreadId_receive;
-    DWORD dwThreadId_send;
-
-    pData->p_lock = p_lock;
-    //pData->start_line_sephamore = p_start_line_sephamore;
-    pData->m_socket = m_socket;
-    *pData->receive_thread_result = -1;
-
-    hThread[0] = CreateThread(
-        NULL,
-        0,
-        SendDataThread,
-        pData,
-        0,
-        &dwThreadId_send
-    );
-
-    //In case of error
-    if (NULL == hThread[0])
-    {
-        printf("Brutally terminating the program due to thread dispatch issues");
-        CloseHandle(hThread[0]);
-        return STATUS_CODE_FAILURE;
-    }
-    //Else
-    printf("dispatched sending Thread\n");
-
-    hThread[1] = CreateThread(
-        NULL,
-        0,
-        RecvDataThread,
-        pData,
-        0,
-        &dwThreadId_receive
-    );
-
-    //In case of error
-    if (NULL == hThread[1])
-    {
-        printf("Brutally terminating the program due to thread dispatch issues");
-        CloseHandle(hThread[1]);
-        return STATUS_CODE_FAILURE;
-    }
-    //Else
-    printf("dispatched receiving Thread\n");
-
-    //// Release start line Sephamore
-    //if (FALSE == (ReleaseSemaphore(*p_start_line_sephamore, number_of_threads, NULL)))
-    //{
-    //    printf("Couldn't release start line semaphore");
-    //    return STATUS_CODE_FAILURE;
-    //}
-    //printf("start line semaphore released\n");
-
-    // escorting the threads for exit
-    if (STATUS_CODE_FAILURE == (wait_for_threads_execution_and_free(hThread, m_socket)))
-    {
-        printf("There was a wait error while we waited for all of the threads");
-        return STATUS_CODE_FAILURE;
-    }
-
-    // Success
-    printf("freed all threads\n");
-    return SUCCESS_CODE;
+    if (WSACleanup() == SOCKET_ERROR) printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 }
 
 
 int WhatWasReceived(char* AcceptedStr)
 {
-    if (0 == strcmp(AcceptedStr, "SERVER_MAIN_MENU\n")) return SERVER_MAIN_MENU;
-    if (0 == strcmp(AcceptedStr, "SERVER_APPROVED\n")) return SERVER_APPROVED;
-    if (0 == strcmp(AcceptedStr, "SERVER_INVITE\n")) return SERVER_INVITE;
-    if (0 == strcmp(AcceptedStr, "SERVER_SETUP_REQUEST\n")) return SERVER_SETUP_REQUEST;
-    if (0 == strcmp(AcceptedStr, "SERVER_PLAYER_MOVE_REQUEST\n")) return SERVER_PLAYER_MOVE_REQUEST;
-    if (0 == strcmp(AcceptedStr, "SERVER_GAME_RESULTS\n")) return SERVER_GAME_RESULTS;
-    if (0 == strcmp(AcceptedStr, "SERVER_WIN\n")) return SERVER_WIN;
-    if (0 == strcmp(AcceptedStr, "SERVER_DRAW\n")) return SERVER_DRAW;
-    if (0 == strcmp(AcceptedStr, "SERVER_NO_OPPONENTS\n")) return SERVER_NO_OPPONENTS;
-    if (0 == strcmp(AcceptedStr, "SERVER_OPPONENT_QUIT\n")) return SERVER_OPPONENT_QUIT;
-    //if (0 == strcmp(AcceptedStr, "SERVER_DENIED\n")) return SERVER_DENIED;
+    if (0 == strcmp(AcceptedStr, "CLIENT_REQUEST")) return CLIENT_REQUEST;
+    if (0 == strcmp(AcceptedStr, "CLIENT_VERSUS")) return CLIENT_VERSUS;
+    if (0 == strcmp(AcceptedStr, "CLIENT_SETUP")) return CLIENT_SETUP;
+    if (0 == strcmp(AcceptedStr, "CLIENT_PLAYER_MOVE")) return CLIENT_PLAYER_MOVE;
+    if (0 == strcmp(AcceptedStr, "CLIENT_DISCONNECT")) return CLIENT_DISCONNECT;
 
     // Upon failure
     return STATUS_CODE_FAILURE;
 }
 
 
-void DefineStringToSend(THREAD* thread_params, char string_received[], char string_to_send[])
+ReadFromFile(char filename[], char string[], int string_len, int offset)
 {
-    //now to define strings to send
-    return;
+	HANDLE file_handle = GetFile(filename, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING);
+	int i = 0;
+	// offset string
+	DWORD dwPtr = SetFilePointer(file_handle, offset, NULL, FILE_BEGIN);
+
+	// read string
+	for (i = 0; i < string_len; i++)
+	{
+		if (FALSE == ReadFile(file_handle, string[i], 1, NULL, NULL)); ///return error
+		if (string[i] = '\r') break;
+	}
+	string[i] = '\0';
+
+	//Success
+	CloseHandle(file_handle);
+	return SUCCESS_CODE;
 }
 
 
-DWORD WINAPI RecvDataThread(LPVOID lpParam)
+int PrintToFile(char filename[], char string[], int string_len)
 {
+	HANDLE file_handle = GetFile(filename, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING);
 
-    TransferResult_t RecvRes;
-    THREAD* thread_params = (THREAD*)lpParam;
-    DWORD wait_res;
-    BOOL release_res;
+	// write string
+	if (STATUS_CODE_FAILURE == StringToFileWithCheck(file_handle, string, string_len)) return STATUS_CODE_FAILURE;
 
-    while (1)
-    {
-        char* AcceptedStr = NULL;
-        RecvRes = ReceiveString(&AcceptedStr, (*thread_params->m_socket));
-
-        if (RecvRes == TRNS_FAILED)
-        {
-            printf("Socket error while trying to read data from socket\n");
-            return 0x555;
-        }
-        else if (RecvRes == TRNS_DISCONNECTED)
-        {
-            printf("Server closed connection. Bye!\n");
-            return 0x555;
-        }
-        else
-        {
-            *thread_params->receive_thread_result = WhatWasReceived(AcceptedStr);
-        }
-
-        free(AcceptedStr);
-    }
-
-    return SUCCESS_CODE;
+	//Success
+	CloseHandle(file_handle);
+	return SUCCESS_CODE;
 }
 
 
-DWORD WINAPI SendDataThread(LPVOID lpParam)
+int StringToFileWithCheck(HANDLE file_handle, char string[], int string_len)
 {
+	DWORD dwPtr = SetFilePointer(file_handle, 0, NULL, FILE_END);
 
-    char    client_request_str[37],
-        client_versus_str[] = "CLIENT_VERSUS\n",
-        client_setup_str[19],
-        client_player_move_str[25],
-        client_disconnect_str[] = "CLIENT_DISCONNECT\n";
-
-    TransferResult_t SendRes;
-    THREAD* thread_params = (THREAD*)lpParam;
-    DWORD wait_res;
-    BOOL release_res;
-
-    char string_received[5] = NULL;
-    char string_to_send[37] = NULL;
-
-    while (1)
-    {
-        gets_s(string_received, 5); //Reading a string from the keyboard
-
-        if (strcmp(string_received, "2"))
-            return 0x555; //"quit" signals an exit from the client side
-
-        DefineStringToSend(thread_params, string_received, string_to_send);
-
-        SendRes = SendString(string_to_send, (*thread_params->m_socket));
-
-        if (SendRes == TRNS_FAILED)
-        {
-            printf("Socket error while trying to write data to socket\n");
-            return 0x555;
-        }
-    }
+	if (FALSE == WriteFile(file_handle, string, string_len, NULL, NULL))
+	{
+		printf("couldn't open file to be write in WINAPI\n");
+		CloseHandle(file_handle);
+		return STATUS_CODE_FAILURE;
+	}
+	return SUCCESS_CODE;
 }
 
 
+HANDLE GetFile(LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition) {
+	HANDLE file_handle;
+
+	if (NULL == lpFileName || 0 == dwDesiredAccess || 0 == dwShareMode)
+	{
+		printf("Received null pointer");
+		return NULL;
+	}
+
+	file_handle = CreateFileA(
+		lpFileName,				//The name of the file or device to be created or opened.
+		dwDesiredAccess,        //The requested access to the file or device, which can be summarized 
+								//as read, write, both or neither zero).
+								//The most commonly used values are 
+								//GENERIC_READ, GENERIC_WRITE, or both(GENERIC_READ | GENERIC_WRITE).
+		dwShareMode,            //The requested sharing mode of the file or device, which can be read, 
+								//write, both, delete, all of these, or none 
+								//FILE_SHARE_READ 1 OR FILE_SHARE_WRITE 2
+		NULL,
+		dwCreationDisposition,  //Should be CREATE_ALWAYS to overwrite or OPEN_EXISTING TO READ
+		FILE_ATTRIBUTE_NORMAL,
+		NULL);
+
+	if (NULL == file_handle)
+	{
+		printf("Couldn't create file\n");
+		return NULL;
+	}
+
+	return file_handle;
+}
+
+
+//Service thread is the thread that opens for each successful client connection and "talks" to the client.
+DWORD WINAPI ServiceThread(LPVOID lpParam)
+{
+	char send_string[MAX_BYTES_SERVER_MIGHT_SEND];
+	char received_string[MAX_BYTES_CLIENT_MIGHT_SEND];
+	char client_number[5] = "0000";
+	char opponent_number[5] = "0000";
+	char client_guess[5] = "0000";
+	char opponent_guess[5] = "0000";
+	char client_name[21] = "00000000000000000000";
+	char opponent_name[21] = "00000000000000000000";
+
+	char server_main_menu_str[] = "SERVER_MAIN_MENU\n",
+		server_approved_str[] = "SERVER_APPROVED\n",
+		server_denied_1_str[] = "SERVER_DENIED\n",
+		server_denied_2_str[] = "SERVER_DENIED\n",
+		server_invite[] = "SERVER_INVITE:",
+		server_invite_str[36],
+		server_setup_request_str[] = "SERVER_SETUP_REQUEST\n",
+		server_player_move_request_str[] = "SERVER_PLAYER_MOVE_REQUEST\n",
+		server_game_results_str[66],
+		server_win_str[38],
+		server_draw_str[] = "SERVER_DRAW\n",
+		server_no_opponents_str[] = "SERVER_NO_OPPONENTS\n",
+		server_opponent_quit_str[] = "SERVER_OPPONENT_QUIT\n";
+
+	THREAD* thread_params = (THREAD*)lpParam;
+	TransferResult_t SendRes;
+	TransferResult_t RecvRes;
+
+	int i = 0, game_state = I_START;
+
+	HANDLE file_handle;
+	SOCKET* ThreadInputs;
+	LOCK* p_lock;
+	char* tasks_file_name;
+	int thread_id;
+
+	DWORD wait_res;
+	BOOL release_res;
+
+	while (game_state != CLIENT_DISCONNECT)
+	{
+		switch (game_state)
+		{
+		case I_START:
+		{
+			// Only thread[0] opens the file
+			if (thread_params->thread_id == 0)
+			{
+				if (NULL == (*thread_params->p_mutex_file = CreateMutex(NULL, TRUE, NULL))) CloseHandle(*thread_params->p_mutex_file);  /// add a return
+			}
+			RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+			//Server approved
+			strcpy_s(send_string, strlen(server_approved_str), server_approved_str);
+			SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+			GetClientName(received_string, client_name);
+			game_state = WhatWasReceived(received_string);
+			break;
+		}
+		case CLIENT_REQUEST:
+		{
+			//Server Main Menu
+			strcpy_s(send_string, strlen(server_main_menu_str), server_main_menu_str);
+			SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+			//wait forever
+			RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+			game_state = WhatWasReceived(received_string);
+			break;
+		}
+		case CLIENT_VERSUS:
+		{
+			//signal one half of the event
+			//wait for the event to be fully signaled for 15 seconds
+			if (timeout_wait)
+			{
+				strcpy_s(send_string, strlen(server_no_opponents_str), server_no_opponents_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				game_state = CLIENT_REQUEST;
+			}
+			// Two opponents are connected
+			else
+			{
+				// Only thread[0] opens the file
+				if (thread_params->thread_id == 0) 	file_handle = GetFile(thread_params->tasks_file_name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS);
+				*thread_params->stage_of_game = 0;
+				if (thread_params->thread_id == 0)
+				{
+					PrintToFile(thread_params->tasks_file_name, client_name, strlen(client_name));
+					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+					{
+						printf("Couldn't release Mutex");
+						return wait_res;
+					}
+					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+					ReadFromFile(thread_params->tasks_file_name, opponent_name, strlen(opponent_name), thread_params->stage_of_game);				//need to calculate offset better
+
+				}
+				else
+				{
+					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+					ReadFromFile(thread_params->tasks_file_name, opponent_name, strlen(opponent_name), thread_params->stage_of_game);				//need to calculate offset better
+					PrintToFile(thread_params->tasks_file_name, client_name, strlen(client_name));
+					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+					{
+						printf("Couldn't release Mutex");
+						return wait_res;
+					}
+				}
+
+				// Save opponents name
+				for (i = 0; i < strlen(server_invite); i++)
+				{
+					server_invite_str[i] = server_invite[i];
+				}
+				i = 0;
+				while (opponent_name[i] != '\0')
+				{
+					server_invite_str[i + strlen(server_invite)] = opponent_name[i];
+					i++;
+				}
+				server_invite_str[i + strlen(server_invite)] = '\0';
+
+				*thread_params->stage_of_game++;
+
+				// Server invite
+				strcpy_s(send_string, strlen(server_invite_str), server_invite_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				// Server Setup request
+				strcpy_s(send_string, strlen(server_setup_request_str), server_setup_request_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+				// Copy the clients number including the NULL sign
+				for (i = 0; i < 5; i++) client_number[i] = received_string[i + 13];
+
+				if (thread_params->thread_id == 0)
+				{
+					PrintToFile(thread_params->tasks_file_name, client_number, strlen(client_number));
+					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+					{
+						printf("Couldn't release Mutex");
+						return wait_res;
+					}					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+					ReadFromFile(thread_params->tasks_file_name, opponent_number, strlen(opponent_number), thread_params->stage_of_game);				//need to calculate offset better
+				}
+				else
+				{
+					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+					ReadFromFile(thread_params->tasks_file_name, opponent_number, strlen(opponent_number), thread_params->stage_of_game);				//need to calculate offset better
+					PrintToFile(thread_params->tasks_file_name, client_number, strlen(client_number));
+					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+					{
+						printf("Couldn't release Mutex");
+						return wait_res;
+					}
+				}
+				*thread_params->stage_of_game++;
+				game_state = WhatWasReceived(received_string);
+			}
+			break;
+		}
+		case CLIENT_SETUP:
+		{
+			strcpy_s(send_string, strlen(server_player_move_request_str), server_player_move_request_str);
+			SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+			RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+			for (i = 0; i < 5; i++) client_guess[i] = received_string[i + 19];
+
+			if (thread_params->thread_id == 0)
+			{
+				PrintToFile(thread_params->tasks_file_name, client_guess, strlen(client_guess));
+				if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+				{
+					printf("Couldn't release Mutex");
+					return wait_res;
+				}				if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+				ReadFromFile(thread_params->tasks_file_name, opponent_guess, strlen(opponent_guess), thread_params->stage_of_game);				//need to calculate offset better
+			}
+			else
+			{
+				if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+				ReadFromFile(thread_params->tasks_file_name, opponent_guess, strlen(opponent_guess), thread_params->stage_of_game);				//need to calculate offset better
+				PrintToFile(thread_params->tasks_file_name, client_guess, strlen(client_guess));
+				if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+				{
+					printf("Couldn't release Mutex");
+					return wait_res;
+				}
+			}
+			*thread_params->stage_of_game++;
+			game_state = WhatWasReceived(received_string);
+			break;
+		}
+		case CLIENT_PLAYER_MOVE:
+		{
+			// Get server_game_results_str string or server_win_str string
+			if (a player won)
+			{
+				strcpy_s(send_string, strlen(server_win_str), server_win_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				game_state = CLIENT_REQUEST;
+				if (thread_params->thread_id == 0)
+				{
+					//clean the file
+				}
+				
+			}
+			else if (it is a tie)
+			{
+				strcpy_s(send_string, strlen(server_draw_str), server_draw_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				game_state = CLIENT_REQUEST;
+				if (thread_params->thread_id == 0)
+				{
+					//clean the file
+				}
+			}
+			else
+			{
+				strcpy_s(send_string, strlen(server_game_results_str), server_game_results_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				game_state = CLIENT_SETUP;
+			}
+			break;
+		}
+		}
+		if (game_state = CLIENT_DISCONNECT)
+		{
+			// Only thread[0] opens the file
+			if (thread_params->thread_id == 0)
+			{
+				//close mutex
+			}
+		}
+		continue;
+	}
+	return 0;
+}

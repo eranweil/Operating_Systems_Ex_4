@@ -22,7 +22,6 @@ All thread related actions header file
 // ----------------------PROJECT INCLUDES--------------------- //
 //-------------------------------------------------------------//
 
-#include "Lock.h"
 #include "fileManager.h"
 #include "SocketSendRecvTools.h"
 #include "HardCodedData.h"
@@ -42,7 +41,7 @@ PARAMETERS -    wait_res - the result of waiting on the sync element
 
 RETURN - void
     --------------------------------------------------------------------------------------------*/
-void WaitError(DWORD wait_res, int thread_num);
+void WaitError(DWORD wait_res);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Calls a wait for multiple objects on an array with all of the running threads
@@ -52,7 +51,7 @@ PARAMETERS - p_threads - an array of thread handles
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int wait_for_threads_execution_and_free(HANDLE* p_threads, int number_of_threads);
+int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - the mother function which dispatches the threads and waits for them to finish their good work.
@@ -67,7 +66,6 @@ PARAMETERS - p_threads - a pointer to an array of handles holding all of the thr
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int dispatch_threads(HANDLE hThread[], SOCKET* m_socket, LOCK* p_lock);
 
 
 int WhatWasReceived(char* AcceptedStr);
@@ -88,20 +86,3 @@ char* GetStringFromClient(char user_input[]);
 void DefineStringToSend(int game_state, char user_input[], char send_string[]);
 
 
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
-
-PARAMETERS - lpParam: holds the data structure of pData for that thread
-
-RETURN - signal exit code.
-    --------------------------------------------------------------------------------------------*/
-DWORD WINAPI RecvData(SOCKET* m_socket, char received_string[]);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
-
-PARAMETERS - lpParam: holds the data structure of pData for that thread
-
-RETURN - signal exit code.
-    --------------------------------------------------------------------------------------------*/
-DWORD WINAPI SendData(SOCKET* m_socket, char send_string[]);

@@ -210,20 +210,25 @@ int main(int argc, char** argv[])
     LOCK        lock;
     LOCK*       p_lock = &lock;
 
-	WSADATA     wsaData;
-
     // Check args given
     if (STATUS_CODE_FAILURE == check_arguments(argc, argv)) return ERROR_CODE_ARGS;
 
-	//Call WSAStartup and check for errors.
-	int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult != NO_ERROR) printf("Error at WSAStartup()\n");
+    // Initialize Winsock.
+    WSADATA wsaData;
+    int StartupRes = WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+    if (StartupRes != NO_ERROR)
+    {
+        printf("error %ld at WSAStartup( ), ending program.\n", WSAGetLastError());
+        // Tell the user that we could not find a usable WinSock DLL.                                  
+        return;
+    }
 
 	// Create a socket and check for errors to ensure that the socket is a valid socket.
 	if ((m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) 
 	{
 		printf("Error at socket(): %ld\n", WSAGetLastError());
-		WSACleanup();																											//need to fix
+		WSACleanup();
 		return;
 	}
 
