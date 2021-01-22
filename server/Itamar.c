@@ -5,8 +5,8 @@ client_number[5]
 opponent_number[5]
 client_guess[5]
 opponent_guess[5]
-client_name[21]
-opponent_name[21]
+client_name[21] //that is the max, 20 charachters and a NULL sign. Could be the name is less
+opponent_name[21] //that is the max, 20 charachters and a NULL sign. Could be the name is less
 server_game_results_str[66] = "SERVER_GAME_RESULTS:num_of_bulls;num_of_cows;opponents_name;opponents_guess\n";
 server_win_str[38] = "SERVER_WIN:winners_name;opponents_guess\n"
 p_game_result
