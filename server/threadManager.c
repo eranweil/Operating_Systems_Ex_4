@@ -83,6 +83,10 @@ void WaitError(DWORD wait_res)
 }
 
 
+void GetGameResults(char client_number[], char opponent_number[], char client_guess[], char opponent_guess[], char client_name[], char opponent_name[], char server_game_results_str[], char server_win_str[], int* p_game_result);
+//void GetGameResults(char client_number[5], char opponent_number[5], char client_guess[5], char opponent_guess[5], char client_name[21], char opponent_name[21], char server_game_results_str[66], char server_win_str[38], int* p_game_result);
+
+
 int wait_for_threads_execution_and_free(HANDLE ThreadHandles[], SOCKET ThreadInputs[])
 {
     int i = 0;
@@ -245,7 +249,8 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 	TransferResult_t SendRes;
 	TransferResult_t RecvRes;
 
-	int i = 0, game_state = I_START;
+	int i = 0, game_state = I_START, game_result = GAME_CONTINUES;
+	int* p_game_result = &game_result;
 
 	HANDLE file_handle;
 	SOCKET* ThreadInputs;
@@ -260,111 +265,146 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 	{
 		switch (game_state)
 		{
-		case I_START:
-		{
-			// Only thread[0] opens the file
-			if (thread_params->thread_id == 0)
-			{
-				if (NULL == (*thread_params->p_mutex_file = CreateMutex(NULL, TRUE, NULL))) CloseHandle(*thread_params->p_mutex_file);  /// add a return
-			}
-			RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
-			//Server approved
-			strcpy_s(send_string, strlen(server_approved_str), server_approved_str);
-			SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-			GetClientName(received_string, client_name);
-			game_state = WhatWasReceived(received_string);
-			break;
-		}
-		case CLIENT_REQUEST:
-		{
-			//Server Main Menu
-			strcpy_s(send_string, strlen(server_main_menu_str), server_main_menu_str);
-			SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-			//wait forever
-			RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
-			game_state = WhatWasReceived(received_string);
-			break;
-		}
-		case CLIENT_VERSUS:
-		{
-			//signal one half of the event
-			//wait for the event to be fully signaled for 15 seconds
-			if (timeout_wait)
-			{
-				strcpy_s(send_string, strlen(server_no_opponents_str), server_no_opponents_str);
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-				game_state = CLIENT_REQUEST;
-			}
-			// Two opponents are connected
-			else
+			case I_START:
 			{
 				// Only thread[0] opens the file
-				if (thread_params->thread_id == 0) 	file_handle = GetFile(thread_params->tasks_file_name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS);
-				*thread_params->stage_of_game = 0;
 				if (thread_params->thread_id == 0)
 				{
-					PrintToFile(thread_params->tasks_file_name, client_name, strlen(client_name));
-					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
-					{
-						printf("Couldn't release Mutex");
-						return wait_res;
-					}
-					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
-					ReadFromFile(thread_params->tasks_file_name, opponent_name, strlen(opponent_name), thread_params->stage_of_game);				//need to calculate offset better
-
+					if (NULL == (*thread_params->p_mutex_file = CreateMutex(NULL, TRUE, NULL))) CloseHandle(*thread_params->p_mutex_file);  /// add a return
 				}
+				RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+				//Server approved
+				strcpy_s(send_string, strlen(server_approved_str), server_approved_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				GetClientName(received_string, client_name);
+				game_state = WhatWasReceived(received_string);
+				break;
+			}
+			case CLIENT_REQUEST:
+			{
+				//Server Main Menu
+				strcpy_s(send_string, strlen(server_main_menu_str), server_main_menu_str);
+				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+				//wait forever
+				RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+				game_state = WhatWasReceived(received_string);
+				break;
+			}
+			case CLIENT_VERSUS:
+			{
+				//signal one half of the event
+				//wait for the event to be fully signaled for 15 seconds
+				if (timeout_wait)
+				{
+					strcpy_s(send_string, strlen(server_no_opponents_str), server_no_opponents_str);
+					SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+					game_state = CLIENT_REQUEST;
+				}
+				// Two opponents are connected
 				else
 				{
-					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
-					ReadFromFile(thread_params->tasks_file_name, opponent_name, strlen(opponent_name), thread_params->stage_of_game);				//need to calculate offset better
-					PrintToFile(thread_params->tasks_file_name, client_name, strlen(client_name));
-					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+					// Only thread[0] opens the file
+					if (thread_params->thread_id == 0) 	file_handle = GetFile(thread_params->tasks_file_name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, CREATE_ALWAYS);
+					*thread_params->stage_of_game = 0;
+					if (thread_params->thread_id == 0)
 					{
-						printf("Couldn't release Mutex");
-						return wait_res;
+						PrintToFile(thread_params->tasks_file_name, client_name, strlen(client_name));
+						if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+						{
+							printf("Couldn't release Mutex");
+							return wait_res;
+						}
+						if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+						ReadFromFile(thread_params->tasks_file_name, opponent_name, strlen(opponent_name), thread_params->stage_of_game);				//need to calculate offset better
+
 					}
-				}
+					else
+					{
+						if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+						ReadFromFile(thread_params->tasks_file_name, opponent_name, strlen(opponent_name), thread_params->stage_of_game);				//need to calculate offset better
+						PrintToFile(thread_params->tasks_file_name, client_name, strlen(client_name));
+						if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+						{
+							printf("Couldn't release Mutex");
+							return wait_res;
+						}
+					}
 
-				// Save opponents name
-				for (i = 0; i < strlen(server_invite); i++)
-				{
-					server_invite_str[i] = server_invite[i];
-				}
-				i = 0;
-				while (opponent_name[i] != '\0')
-				{
-					server_invite_str[i + strlen(server_invite)] = opponent_name[i];
-					i++;
-				}
-				server_invite_str[i + strlen(server_invite)] = '\0';
+					// Save opponents name
+					for (i = 0; i < strlen(server_invite); i++)
+					{
+						server_invite_str[i] = server_invite[i];
+					}
+					i = 0;
+					while (opponent_name[i] != '\0')
+					{
+						server_invite_str[i + strlen(server_invite)] = opponent_name[i];
+						i++;
+					}
+					server_invite_str[i + strlen(server_invite)] = '\0';
 
-				*thread_params->stage_of_game++;
+					*thread_params->stage_of_game++;
 
-				// Server invite
-				strcpy_s(send_string, strlen(server_invite_str), server_invite_str);
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-				// Server Setup request
-				strcpy_s(send_string, strlen(server_setup_request_str), server_setup_request_str);
+					// Server invite
+					strcpy_s(send_string, strlen(server_invite_str), server_invite_str);
+					SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+					// Server Setup request
+					strcpy_s(send_string, strlen(server_setup_request_str), server_setup_request_str);
+					SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+					RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+					// Copy the clients number including the NULL sign
+					for (i = 0; i < 5; i++) client_number[i] = received_string[i + 13];
+
+					if (thread_params->thread_id == 0)
+					{
+						PrintToFile(thread_params->tasks_file_name, client_number, strlen(client_number));
+						if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+						{
+							printf("Couldn't release Mutex");
+							return wait_res;
+						}					
+						if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+						ReadFromFile(thread_params->tasks_file_name, opponent_number, strlen(opponent_number), thread_params->stage_of_game);				//need to calculate offset better
+					}
+					else
+					{
+						if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+						ReadFromFile(thread_params->tasks_file_name, opponent_number, strlen(opponent_number), thread_params->stage_of_game);				//need to calculate offset better
+						PrintToFile(thread_params->tasks_file_name, client_number, strlen(client_number));
+						if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+						{
+							printf("Couldn't release Mutex");
+							return wait_res;
+						}
+					}
+					*thread_params->stage_of_game++;
+					game_state = WhatWasReceived(received_string);
+				}
+				break;
+			}
+			case CLIENT_SETUP:
+			{
+				strcpy_s(send_string, strlen(server_player_move_request_str), server_player_move_request_str);
 				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
 				RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
-				// Copy the clients number including the NULL sign
-				for (i = 0; i < 5; i++) client_number[i] = received_string[i + 13];
+				for (i = 0; i < 5; i++) client_guess[i] = received_string[i + 19];
 
 				if (thread_params->thread_id == 0)
 				{
-					PrintToFile(thread_params->tasks_file_name, client_number, strlen(client_number));
+					PrintToFile(thread_params->tasks_file_name, client_guess, strlen(client_guess));
 					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
 					{
 						printf("Couldn't release Mutex");
 						return wait_res;
-					}					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
-					ReadFromFile(thread_params->tasks_file_name, opponent_number, strlen(opponent_number), thread_params->stage_of_game);				//need to calculate offset better
+					}				
+					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
+					ReadFromFile(thread_params->tasks_file_name, opponent_guess, strlen(opponent_guess), thread_params->stage_of_game);				//need to calculate offset better
 				}
 				else
 				{
 					if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
-					ReadFromFile(thread_params->tasks_file_name, opponent_number, strlen(opponent_number), thread_params->stage_of_game);				//need to calculate offset better
-					PrintToFile(thread_params->tasks_file_name, client_number, strlen(client_number));
+					ReadFromFile(thread_params->tasks_file_name, opponent_guess, strlen(opponent_guess), thread_params->stage_of_game);				//need to calculate offset better
+					PrintToFile(thread_params->tasks_file_name, client_guess, strlen(client_guess));
 					if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
 					{
 						printf("Couldn't release Mutex");
@@ -373,73 +413,42 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				}
 				*thread_params->stage_of_game++;
 				game_state = WhatWasReceived(received_string);
+				break;
 			}
-			break;
-		}
-		case CLIENT_SETUP:
-		{
-			strcpy_s(send_string, strlen(server_player_move_request_str), server_player_move_request_str);
-			SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-			RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
-			for (i = 0; i < 5; i++) client_guess[i] = received_string[i + 19];
+			case CLIENT_PLAYER_MOVE:
+			{
+				// Get server_game_results_str string or server_win_str string
+				GetGameResults(client_number, opponent_number, client_guess, opponent_guess, client_name, opponent_name, server_game_results_str, server_win_str, p_game_result);
 
-			if (thread_params->thread_id == 0)
-			{
-				PrintToFile(thread_params->tasks_file_name, client_guess, strlen(client_guess));
-				if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
+				if (game_result == GAME_WON)
 				{
-					printf("Couldn't release Mutex");
-					return wait_res;
-				}				if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
-				ReadFromFile(thread_params->tasks_file_name, opponent_guess, strlen(opponent_guess), thread_params->stage_of_game);				//need to calculate offset better
-			}
-			else
-			{
-				if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME))) return wait_res;
-				ReadFromFile(thread_params->tasks_file_name, opponent_guess, strlen(opponent_guess), thread_params->stage_of_game);				//need to calculate offset better
-				PrintToFile(thread_params->tasks_file_name, client_guess, strlen(client_guess));
-				if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
-				{
-					printf("Couldn't release Mutex");
-					return wait_res;
-				}
-			}
-			*thread_params->stage_of_game++;
-			game_state = WhatWasReceived(received_string);
-			break;
-		}
-		case CLIENT_PLAYER_MOVE:
-		{
-			// Get server_game_results_str string or server_win_str string
-			if (a player won)
-			{
-				strcpy_s(send_string, strlen(server_win_str), server_win_str);
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-				game_state = CLIENT_REQUEST;
-				if (thread_params->thread_id == 0)
-				{
-					//clean the file
-				}
+					strcpy_s(send_string, strlen(server_win_str), server_win_str);
+					SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+					game_state = CLIENT_REQUEST;
+					if (thread_params->thread_id == 0)
+					{
+						//clean the file
+					}
 				
-			}
-			else if (it is a tie)
-			{
-				strcpy_s(send_string, strlen(server_draw_str), server_draw_str);
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-				game_state = CLIENT_REQUEST;
-				if (thread_params->thread_id == 0)
-				{
-					//clean the file
 				}
+				else if (game_result == GAME_DRAW)
+				{
+					strcpy_s(send_string, strlen(server_draw_str), server_draw_str);
+					SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+					game_state = CLIENT_REQUEST;
+					if (thread_params->thread_id == 0)
+					{
+						//clean the file
+					}
+				}
+				else
+				{
+					strcpy_s(send_string, strlen(server_game_results_str), server_game_results_str);
+					SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
+					game_state = CLIENT_SETUP;
+				}
+				break;
 			}
-			else
-			{
-				strcpy_s(send_string, strlen(server_game_results_str), server_game_results_str);
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], send_string);
-				game_state = CLIENT_SETUP;
-			}
-			break;
-		}
 		}
 		if (game_state = CLIENT_DISCONNECT)
 		{

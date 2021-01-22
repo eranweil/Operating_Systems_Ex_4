@@ -67,6 +67,11 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define SERVER_OPPONENT_QUIT                    9
 #define SERVER_DENIED                           10
 
+// Game result codes
+#define GAME_CONTINUES                          0
+#define GAME_WON                                1
+#define GAME_DRAW                               2
+
 // Constants
 #define SERVER_ADDRESS_STR                      "127.0.0.1"
 #define NUM_OF_WORKER_THREADS                   2
