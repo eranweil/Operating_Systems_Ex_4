@@ -31,57 +31,61 @@ All thread related actions header file
 //---------------------------------------------------------------//
 
 /*--------------------------------------------------------------------------------------------
-DESCRIPTION - A debug function to print out the wait error on a sync element
+DESCRIPTION - check what the client sent
 
-PARAMETERS -    wait_res - the result of waiting on the sync element
-                thread_num - the number of the thread, used for print
-                number_of_tasks - number of tasks to be pushed into the queue
-                priority_file_name - The name of the priority file for the WINAPI read function
+PARAMETERS - client sent string
+
+RETURN - success code upon success or failure code otherwise
+    --------------------------------------------------------------------------------------------*/
+int WhatWasReceived(char* AcceptedStr);
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - Gets opponent name length in bytes and saves it to the address of a pointer
+
+PARAMETERS - string to calculate bytes and pointer to address where we wish to save the length to
 
 RETURN - void
     --------------------------------------------------------------------------------------------*/
-void WaitError(DWORD wait_res);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - Calls a wait for multiple objects on an array with all of the running threads
-
-PARAMETERS - p_threads - an array of thread handles
-             number_of_threads - the number of threads to wait for
-
-RETURN - success code upon success or failure code otherwise
-    --------------------------------------------------------------------------------------------*/
-void wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - the mother function which dispatches the threads and waits for them to finish their good work.
-
-PARAMETERS - p_threads - a pointer to an array of handles holding all of the thread handles
-             p_lock - a pointer to the joint lock element
-             p_queue - a pointer to the joint queue element
-             number_of_threads - the number of threads specified by the user
-             p_number_of_tasks - a pointer to an integer with the number of tasks left. each thread is responsible to update it
-             start_line_sephamore - this is a joint semaphore used to send all of the threads on their way simultaneously
-             tasks_file_name - the name of the tasks file
-
-RETURN - success code upon success or failure code otherwise
-    --------------------------------------------------------------------------------------------*/
-
-
-int WhatWasReceived(char* AcceptedStr);
-
-
 void OpponentNameLenInBytes(char received_string[], int* p_opponent_name_len);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - function to get the results of the current game stage and saves it to all the buffers given
 
+PARAMETERS - the string received, the length of the opponent name and buffers to save the number of cows, bulls, opponent guess and opponent name
+
+RETURN - void
+    --------------------------------------------------------------------------------------------*/
 void BreakDownGameResultsString(char received_string[], char bulls[], char cows[], char opponent_username[], char opponent_guess[], int opponent_name_len);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - function to get the winners name and opponent number
 
+PARAMETERS - the string received, and buffers to save the winners name and opponent number
+
+RETURN - void
+    --------------------------------------------------------------------------------------------*/
 void GetWinnersNameAndOpponentsGuess(char received_string[], char winners_name[], char opponent_guess[]);
 
-
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - a simple function to get input from the client
+    --------------------------------------------------------------------------------------------*/
 char* GetStringFromClient(char user_input[]);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - A function which creates the string to send based on game stage and user input
 
-void DefineStringToSend(int game_state, char user_input[], char send_string[]);
+PARAMETERS - game stage, user input and buffer to which we write the string to send
 
+RETURN - void
+    --------------------------------------------------------------------------------------------*/
+void DefineStringToSend(int* p_game_state, char user_input[], char send_string[]);
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - The main client function. calculates what to do at wach state based on the server data sent and client input
+
+PARAMETERS - All of the necessary buffers to save data to for read and write, as well as the socket data to communicate with the server
+
+RETURN - success code upon success or failure code otherwise
+    --------------------------------------------------------------------------------------------*/
+int GameState(SOCKET* m_socket, SOCKADDR_IN* p_clientService, int* p_game_state, char user_input[], char send_string[], char received_string[], char server_ip[], char server_port[], int* p_opponent_name_len, char winners_name[], char opponent_username[], char bulls[], char cows[], char opponent_guess[]);
 

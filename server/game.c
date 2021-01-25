@@ -1,26 +1,9 @@
-//client_number[5]
-//opponent_number[5]
-//client_guess[5]
-//opponent_guess[5]
-//client_name[21] //that is the max, 20 charachters and a NULL sign. Could be the name is less
-//opponent_name[21] //that is the max, 20 charachters and a NULL sign. Could be the name is less
-//server_game_results_str[66] = "SERVER_GAME_RESULTS:num_of_bulls;num_of_cows;opponents_name;opponents_guess\n";
-//server_win_str[38] = "SERVER_WIN:winners_name;opponents_guess\n"
-//p_game_result
-
 
 /*
 game.c
 ----------------------------------------------------------------------------
 bulls & cows functions
 */
-
-//-------------------------------------------------------------//
-// --------------------------INCLUDE-------------------------- //
-//-------------------------------------------------------------//
-
-#include <stdio.h>
-#include <stdlib.h>
 
 //-------------------------------------------------------------//
 // ----------------------PROJECT INCLUDES--------------------- //
@@ -89,35 +72,10 @@ void CleanName(char raw[]);
 //---------------------------------------------------------------//
 
 
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - takes guesses and numbers of the client and it's opponent. declares a winner/draw if there is one. otherwise let's the
-			  client get his results.
-
-PARAMETERS -    client_number[]
-				opponent_number[]
-				client_guess[]
-				opponent_guess[]
-				client_name[]
-				opponent_name[]
-				server_game_results_str[] - holds bulls,cows, opponent name and guess
-				server_win_str[] - changes to winners name if he wins
-				p_game_result - holding the result of the round
-
-RETURN - void
-	--------------------------------------------------------------------------------------------*/
 void GetGameResults(char client_number[], char opponent_number[], char client_guess[], char opponent_guess[],
 	char client_name[], char opponent_name[], char server_game_results_str[], char server_win_str[], int* p_game_result)
 {
-	// The function belongs to the thread working with the client
-	// The the function calculates if somebody won, if it is a draw or if the game continues
-	// If there is a win:
-		// update server_win_str[] with the correct name of the winner, which is either client or opponent
-		// update &p_game_result as GAME_WON
-	// If there is a draw:
-		// update &p_game_result as GAME_DRAW
-	// If neither, the game continues
-		// update server_game_results_str[] with the correct number of bulls, cows, opponents_name and opponents_guess
-		// &p_game_result is already GAME_CONTINUES
+
 	int client_win = 0; 
 	int opponent_win = 0;
 	int game = 0;
@@ -151,7 +109,7 @@ void GetGameResults(char client_number[], char opponent_number[], char client_gu
 
 	switch (game) {
 		case 0: // game continues
-	
+			*p_game_result = GAME_CONTINUES;
 			// updating server_game_results_str array
 			for (i = 0; i < strlen(server_game_results); i++) server_game_results_str[i] = server_game_results[i];
 			for (i = 0; i < strlen(client_bulls); i++) server_game_results_str[i + strlen(server_game_results)] = client_bulls[i];
@@ -188,15 +146,6 @@ void GetGameResults(char client_number[], char opponent_number[], char client_gu
 }
 
 
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - takes a guess and a target number, returns a string with the result. win is 'BBBB'
-
-PARAMETERS -    char player_guess[]
-				char target_number[]
-
-RETURN - 4 char array with B/C/M for bull/cow/miss. 
-	--------------------------------------------------------------------------------------------*/
 void CheckGuess(char player_guess[], char target_number[], char* res) {
 
 	int i, j;
@@ -216,13 +165,6 @@ void CheckGuess(char player_guess[], char target_number[], char* res) {
 }
 
 
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - takes an array holding results by chars and counts occurences of A.
-
-PARAMETERS -    player_res[]
-
-RETURN - pointer to the number as char
-	--------------------------------------------------------------------------------------------*/
 void GetBullsOrCows(char player_res[], char A, char dest[]) {
 	int i;
 	int count = 0;
@@ -236,13 +178,6 @@ void GetBullsOrCows(char player_res[], char A, char dest[]) {
 }
 
 
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - clears \r\n from array
-
-PARAMETERS -    raw[]
-
-RETURN - void
-	--------------------------------------------------------------------------------------------*/
 void CleanName(char raw[]) {
 	for (int i = 0, j = 0; raw[i] != '\0'; i++)
 		if ((raw[i] != '\r') && (raw[i] != '\n'))

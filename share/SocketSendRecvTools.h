@@ -1,7 +1,7 @@
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 /* 
- This file was written for instruction purposes for the 
- course "Introduction to Systems Programming" at Tel-Aviv
+ This file is based on a file written for instruction purposes
+ for the course "Introduction to Systems Programming" at Tel-Aviv
  University, School of Electrical Engineering, Winter 2011, 
  by Amnon Drory.
 */
@@ -85,22 +85,20 @@ TransferResult_t ReceiveBuffer( char* OutputBuffer, int RemainingBytesToReceive,
 TransferResult_t ReceiveString(char received_string[], SOCKET sd);
 
 
-/*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
-
 
 /*--------------------------------------------------------------------------------------------
-DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
+DESCRIPTION - function to receive data on socket
 
-PARAMETERS - lpParam: holds the data structure of pData for that thread
+PARAMETERS - socket and buffer to receive to
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
 DWORD WINAPI RecvData(SOCKET m_socket, char received_string[]);
 
 /*--------------------------------------------------------------------------------------------
-DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
+DESCRIPTION - function to send data on socket
 
-PARAMETERS - lpParam: holds the data structure of pData for that thread
+PARAMETERS - socket and buffer to send
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/

@@ -9,7 +9,6 @@
 
 #include "SocketSendRecvTools.h"
 
-
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
 TransferResult_t SendBuffer( const char* Buffer, int BytesToSend, SOCKET sd )
@@ -62,6 +61,7 @@ TransferResult_t SendString(const char* Str, SOCKET sd)
 
 	return SendRes;
 }
+
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
 TransferResult_t ReceiveBuffer( char* OutputBuffer, int BytesToReceive, SOCKET sd )
@@ -126,7 +126,7 @@ TransferResult_t ReceiveString(char received_string[], SOCKET sd )
 	return RecvRes;
 }
 
-
+/*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
 DWORD WINAPI RecvData(SOCKET m_socket, char received_string[])
 {
@@ -138,12 +138,12 @@ DWORD WINAPI RecvData(SOCKET m_socket, char received_string[])
 	if (RecvRes == TRNS_FAILED)
 	{
 		printf("Socket error while trying to read data from socket\n");
-		return 0x555;
+		return STATUS_CODE_FAILURE;
 	}
 	else if (RecvRes == TRNS_DISCONNECTED)
 	{
 		printf("Server closed connection. Bye!\n");
-		return 0x555;
+		return STATUS_CODE_FAILURE;
 	}
 	else
 	{
@@ -151,17 +151,18 @@ DWORD WINAPI RecvData(SOCKET m_socket, char received_string[])
 	}
 }
 
+/*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
 DWORD WINAPI SendData(SOCKET m_socket, char send_string[])
 {
-
 	TransferResult_t SendRes;
 
 	if ((SendRes = SendString(send_string, m_socket)) == TRNS_FAILED)
 	{
 			printf("Socket error while trying to write data to socket\n");
-			return 0x555;
+			return STATUS_CODE_FAILURE;
 	}
+	return SUCCESS_CODE;
 }
 
 

@@ -16,57 +16,63 @@ All thread related actions
 //---------------------------------------------------------------//
 
 /*--------------------------------------------------------------------------------------------
-DESCRIPTION - A debug function to print out the wait error on a sync element
+DESCRIPTION - check what the client sent
 
-PARAMETERS -    wait_res - the result of waiting on the sync element
-                thread_num - the number of the thread, used for print
-                number_of_tasks - number of tasks to be pushed into the queue
-                priority_file_name - The name of the priority file for the WINAPI read function
+PARAMETERS - client sent string
+
+RETURN - success code upon success or failure code otherwise
+    --------------------------------------------------------------------------------------------*/
+int WhatWasReceived(char* AcceptedStr);
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - Gets opponent name length in bytes and saves it to the address of a pointer
+
+PARAMETERS - string to calculate bytes and pointer to address where we wish to save the length to
 
 RETURN - void
     --------------------------------------------------------------------------------------------*/
-void WaitError(DWORD wait_res);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - Calls a wait for multiple objects on an array with all of the running threads
-
-PARAMETERS - p_threads - an array of thread handles
-             number_of_threads - the number of threads to wait for
-
-RETURN - success code upon success or failure code otherwise
-    --------------------------------------------------------------------------------------------*/
-void wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket);
-
-/*--------------------------------------------------------------------------------------------
-DESCRIPTION - the mother function which dispatches the threads and waits for them to finish their good work.
-
-PARAMETERS - p_threads - a pointer to an array of handles holding all of the thread handles
-             p_lock - a pointer to the joint lock element
-             p_queue - a pointer to the joint queue element
-             number_of_threads - the number of threads specified by the user
-             p_number_of_tasks - a pointer to an integer with the number of tasks left. each thread is responsible to update it
-             start_line_sephamore - this is a joint semaphore used to send all of the threads on their way simultaneously
-             tasks_file_name - the name of the tasks file
-
-RETURN - success code upon success or failure code otherwise
-    --------------------------------------------------------------------------------------------*/
-
-int WhatWasReceived(char* AcceptedStr);
-
-
 void OpponentNameLenInBytes(char received_string[], int* p_opponent_name_len);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - function to get the results of the current game stage and saves it to all the buffers given
 
+PARAMETERS - the string received, the length of the opponent name and buffers to save the number of cows, bulls, opponent guess and opponent name
+
+RETURN - void
+    --------------------------------------------------------------------------------------------*/
 void BreakDownGameResultsString(char received_string[], char bulls[], char cows[], char opponent_username[], char opponent_guess[], int opponent_name_len);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - function to get the winners name and opponent number
 
+PARAMETERS - the string received, and buffers to save the winners name and opponent number
+
+RETURN - void
+    --------------------------------------------------------------------------------------------*/
 void GetWinnersNameAndOpponentsGuess(char received_string[], char winners_name[], char opponent_guess[]);
 
-
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - a simple function to get input from the client
+    --------------------------------------------------------------------------------------------*/
 char* GetStringFromClient(char user_input[]);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - A function which creates the string to send based on game stage and user input
 
-void DefineStringToSend(int game_state, char user_input[], char send_string[]);
+PARAMETERS - game stage, user input and buffer to which we write the string to send
+
+RETURN - void
+    --------------------------------------------------------------------------------------------*/
+void DefineStringToSend(int* p_game_state, char user_input[], char send_string[]);
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - The main client function. calculates what to do at wach state based on the server data sent and client input
+
+PARAMETERS - All of the necessary buffers to save data to for read and write, as well as the socket data to communicate with the server
+
+RETURN - success code upon success or failure code otherwise
+    --------------------------------------------------------------------------------------------*/
+int GameState(SOCKET* m_socket, SOCKADDR_IN* p_clientService, int* p_game_state, char user_input[], char send_string[], char received_string[], char server_ip[], char server_port[], int* p_opponent_name_len, char winners_name[], char opponent_username[], char bulls[], char cows[], char opponent_guess[]);
 
 
 //---------------------------------------------------------------//
@@ -99,43 +105,6 @@ void WaitError(DWORD wait_res)
             break;
         }
     }
-}
-
-
-void wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
-{
-    int i = 0;
-    DWORD dwEvent;
-
-    dwEvent = WaitForMultipleObjects(2, hThread, FALSE, INFINITE);
-
-    if (WAIT_OBJECT_0 == dwEvent)
-    {
-        // Free the threads which were dispatched
-        for (i = 0; i < 2; i++)
-        {
-            CloseHandle(hThread[i]);
-            printf("freed Thread number: %d\n", i + 1);
-        }
-    }
-
-    else
-    {
-        // Print Error message
-        WaitError(dwEvent);
-        // Free the threads which were dispatched, because some might have been
-        for (i = 0; i < 2; i++)
-        {
-            if (hThread[i] != NULL)
-            {
-                CloseHandle(hThread[i]);
-                printf("freed Thread number: %d\n", i + 1);
-            }
-        }
-    }
-
-    closesocket(*m_socket);
-    WSACleanup();
 }
 
 
@@ -182,15 +151,15 @@ void BreakDownGameResultsString(char received_string[], char bulls[], char cows[
     bulls[1] = '\0';
     cows[0] = received_string[cows_index];
     cows[1] = '\0';
-    for (i = 0; i < opponent_name_len; i++) opponent_username[i] = received_string[opponent_name_start_index + i];
+    for (i = 0; i < (opponent_name_len - 1); i++) opponent_username[i] = received_string[opponent_name_start_index + i];
     opponent_username[i] = '\0';
-    for (i = 0; i < 4; i++) opponent_guess[i] = received_string[opponent_guess_start_index + i];
+    for (i = 0; i < 4; i++) opponent_guess[i] = received_string[opponent_guess_start_index + i - 1];
     opponent_guess[i] = '\0';
     return;
 }
 
 
-void GetWinnersNameAndOpponentsGuess(char received_string[], char winners_name[], char opponent_guess[])
+void GetWinnersNameAndOpponentsGuess(char received_string[], char winners_name[], char opponent_guess[])        //what?!?!?!
 {
     int i = 0, winners_name_len = 0;
 
@@ -213,7 +182,7 @@ char* GetStringFromClient(char user_input[])
 }
 
 
-void DefineStringToSend(int game_state, char user_input[], char send_string[])
+void DefineStringToSend(int* p_game_state, char user_input[], char send_string[])
 {
     char    client_request[] = "CLIENT_REQUEST:",
         client_versus_str[] = "CLIENT_VERSUS\n",
@@ -228,7 +197,7 @@ void DefineStringToSend(int game_state, char user_input[], char send_string[])
 
     GetStringFromClient(user_input);
 
-    switch (game_state)
+    switch (*p_game_state)
     {
         case I_START:
         {
@@ -251,7 +220,11 @@ void DefineStringToSend(int game_state, char user_input[], char send_string[])
                 GetStringFromClient(user_input);
             }
                 if (user_input[0] == '1') strcpy_s(send_string, MAX_BYTES_CLIENT_MIGHT_SEND, client_versus_str);
-                if (user_input[0] == '2') strcpy_s(send_string, MAX_BYTES_CLIENT_MIGHT_SEND, client_disconnect_str);
+                if (user_input[0] == '2')
+                {
+                    strcpy_s(send_string, MAX_BYTES_CLIENT_MIGHT_SEND, client_disconnect_str);
+                    *p_game_state = I_QUIT;
+                }
                 break;
             }
         case SERVER_SETUP_REQUEST:
@@ -273,17 +246,241 @@ void DefineStringToSend(int game_state, char user_input[], char send_string[])
             break;
         }
 
-        //case SERVER_DENIED_1:
-        //{
-        //    printf("Server on %s:%s denied the connection request.\nChoose what to do next:\n1. Try to reconnect\n2. Exit\n", server_ip, server_port);
-        //    GetStringFromClient(p_game_state, user_input);
-        //    DefineStringToSend(p_game_state, user_input, send_string);
-        //    SendData(*m_socket, send_string);
-        //    RecvData(*m_socket, received_string);
-        //    *p_game_state = WhatWasReceived(received_string);
-        //    break;
-        //}
     }
     return;
 }
 
+
+int GameState(SOCKET* m_socket, SOCKADDR_IN* p_clientService, int* p_game_state, char user_input[], char send_string[], char received_string[], char server_ip[], char server_port[], int* p_opponent_name_len, char winners_name[], char opponent_username[], char bulls[], char cows[], char opponent_guess[])
+{
+    int res = 0;
+    switch (*p_game_state)
+    {
+    case I_START:
+    {
+        printf("Connected to server on %s:%s\nType in your name:\n", server_ip, server_port);
+        DefineStringToSend(p_game_state, user_input, send_string);
+        if (STATUS_CODE_FAILURE == (SendData(*m_socket, send_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_APPROVED:
+    {
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = SERVER_MAIN_MENU;
+        break;
+    }
+    case SERVER_MAIN_MENU:
+    {
+        printf("Choose what to do next:\n1. Play against another client\n2. Quit\n");
+        DefineStringToSend(p_game_state, user_input, send_string);
+        if (STATUS_CODE_FAILURE == (SendData(*m_socket, send_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        if (*p_game_state == I_QUIT) break;
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_NO_OPPONENTS:
+    {
+        printf("There are currently no opponents available\n");
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("%s", received_string);
+        *p_game_state = SERVER_MAIN_MENU;
+        break;
+    }
+    case SERVER_INVITE:
+    {
+        OpponentNameLenInBytes(received_string, p_opponent_name_len);
+        printf("Game is on!\n");
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_SETUP_REQUEST:
+    {
+        printf("Choose your 4 digits:\n");
+        DefineStringToSend(p_game_state, user_input, send_string);
+        if (STATUS_CODE_FAILURE == (SendData(*m_socket, send_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_PLAYER_MOVE_REQUEST:
+    {
+        printf("Choose your guess:\n");
+        DefineStringToSend(p_game_state, user_input, send_string);
+        if (STATUS_CODE_FAILURE == (SendData(*m_socket, send_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_GAME_RESULTS:
+    {
+        BreakDownGameResultsString(received_string, bulls, cows, opponent_username, opponent_guess, *p_opponent_name_len);
+        printf("Bulls: %s\nCows: %s\n%s played: %s\n", bulls, cows, opponent_username, opponent_guess);
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_WIN:
+    {
+        GetWinnersNameAndOpponentsGuess(received_string, winners_name, opponent_guess);
+        printf("%s won!\nopponents number was %s\n", winners_name, opponent_guess);
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_DRAW:
+    {
+        printf("It’s a tie\n");
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_OPPONENT_QUIT:
+    {
+        printf("Opponent quit.\n");
+        if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
+        printf("\n");
+        *p_game_state = WhatWasReceived(received_string);
+        break;
+    }
+    case SERVER_DENIED:
+    {
+        if (closesocket(*m_socket) == SOCKET_ERROR)
+        {
+            printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
+            *p_game_state = I_QUIT;
+        }
+        printf("Server on %s:%s denied the connection request.\nChoose what to do next:\n1. Try to reconnect\n2. Exit\n", server_ip, server_port);
+        GetStringFromClient(user_input);
+        while (atoi(user_input) < 1 || atoi(user_input) > 2)
+        {
+            printf("You need to choose either '1' or '2'. Other options are unacceptable\n");
+            GetStringFromClient(user_input);
+        }
+        if (user_input[0] == '1')
+        {
+            if ((*m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET)
+            {
+                printf("Error at socket(): %ld\n", WSAGetLastError());
+                WSACleanup();
+                return STATUS_CODE_FAILURE;
+            }
+            if (connect(*m_socket, (SOCKADDR*)p_clientService, sizeof(*p_clientService)) == SOCKET_ERROR) *p_game_state = I_FAIL;
+            else *p_game_state = I_START;
+        }
+        if (user_input[0] == '2')
+        {
+            *p_game_state = I_QUIT;
+        }
+        break;
+    }
+    case I_FAIL:
+    {
+        if (closesocket(*m_socket) == SOCKET_ERROR)
+        {
+            printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
+            *p_game_state = I_QUIT;
+        }
+        printf("Failed connecting to server on %s:%s.\nChoose what to do next:\n1. Try to reconnect\n2. Exit\n", server_ip, server_port);
+        GetStringFromClient(user_input);
+        while (atoi(user_input) < 1 || atoi(user_input) > 2)
+        {
+            printf("You need to choose either '1' or '2'. Other options are unacceptable\n");
+            GetStringFromClient(user_input);
+        }
+        if (user_input[0] == '1')
+        {
+            if ((*m_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET)
+            {
+                printf("Error at socket(): %ld\n", WSAGetLastError());
+                WSACleanup();
+                return STATUS_CODE_FAILURE;
+            }
+            if (connect(*m_socket, (SOCKADDR*)p_clientService, sizeof(*p_clientService)) == SOCKET_ERROR) *p_game_state = I_FAIL;
+            else *p_game_state = I_START;
+        }
+        if (user_input[0] == '2')
+        {
+            *p_game_state = I_QUIT;
+        }
+        break;
+    }
+    case I_QUIT:
+    {
+        return SUCCESS_CODE;
+    }
+    }
+    return SUCCESS_CODE;
+}

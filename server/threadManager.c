@@ -10,7 +10,6 @@ All thread related actions
 //-------------------------------------------------------------//
 
 #include "threadManager.h"
-#include "game.h"
 
 //---------------------------------------------------------------//
 // -------------------------DECLARATIONS------------------------ //
@@ -28,40 +27,83 @@ RETURN - void
     --------------------------------------------------------------------------------------------*/
 void WaitError(DWORD wait_res);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - saves the clients name from the recieved string
+
+PARAMETERS - received_string, client_name
+
+RETURN - void
+	--------------------------------------------------------------------------------------------*/
 void GetClientName(char received_string[], char client_name[]);
 
 /*--------------------------------------------------------------------------------------------
-DESCRIPTION - Calls a wait for multiple objects on an array with all of the running threads
+DESCRIPTION - free all threads, sockets and handles
 
-PARAMETERS - p_threads - an array of thread handles
-             number_of_threads - the number of threads to wait for
+PARAMETERS - all threads, sockets and handles
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int wait_for_threads_execution_and_free(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_players, HANDLE TwoPlayerEventThread);
+int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_players, HANDLE TwoPlayerEventThread, HANDLE ExitThread, HANDLE ExitEvent, HANDLE file_handle, HANDLE mutex_file, HANDLE event_player_2, SOCKET MainSocket, char game_file_name[]);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - check what the client sent
+
+PARAMETERS - client sent string
+
+RETURN - success code upon success or failure code otherwise
+	--------------------------------------------------------------------------------------------*/
 int WhatWasReceived(char* AcceptedStr);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - reads from the contact file between the threads
+
+PARAMETERS - file_handle, string buffer to read to, offset to read from
+
+RETURN - success code upon success or failure code otherwise
+	--------------------------------------------------------------------------------------------*/
 int ReadFromFile(HANDLE file_handle, char string[], int offset);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - writes to the contact file between the threads
+
+PARAMETERS - file_handle, string buffer to write, string len
+
+RETURN - success code upon success or failure code otherwise
+	--------------------------------------------------------------------------------------------*/
 int StringToFileWithCheck(HANDLE file_handle, char string[], int string_len);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - the function for the thread that checks if there are two players or not
+	--------------------------------------------------------------------------------------------*/
 DWORD WINAPI TwoPlayerEventMonitor(LPVOID lpParam);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - the function for the thread that checks if there was an exit
+	--------------------------------------------------------------------------------------------*/
+DWORD WINAPI ExitMonitor(LPVOID lpParam);
+
+/*--------------------------------------------------------------------------------------------
+The threads function to check if there are two players (based on the result of TwoPlayerEventMonitor)
+	--------------------------------------------------------------------------------------------*/
 BOOL PollTwoPlayers(THREAD* thread_params, DWORD time_to_wait, int* p_game_status);
 
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - the protocol to read and write to the joint file while syncing
+
+PARAMETERS - string_to_write buffer, string_to_read buffer, length of the strings and the thread params which have pointers to all of the locks
+
+RETURN - signal exit code.
+	--------------------------------------------------------------------------------------------*/
 BOOL ThreadCommunicationProtocol(THREAD* thread_params, char string_to_write[], char string_to_read[], int client_0_name_len, int client_1_name_len);
 
 /*--------------------------------------------------------------------------------------------
-DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
-
-PARAMETERS - lpParam: holds the data structure of pData for that thread
-
-RETURN - signal exit code.
+DESCRIPTION - The main thread to work with incoming clients
     --------------------------------------------------------------------------------------------*/
 DWORD WINAPI ServiceThread(LPVOID lpParam);
 
-
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - Simplified function to open a file
+	--------------------------------------------------------------------------------------------*/
 HANDLE GetFile(LPCSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, DWORD dwCreationDisposition);
 
 //---------------------------------------------------------------//
@@ -97,12 +139,13 @@ void WaitError(DWORD wait_res)
 }
 
 
-int wait_for_threads_execution_and_free(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_players, HANDLE TwoPlayerEventThread)
+int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_players, HANDLE TwoPlayerEventThread, HANDLE ExitThread, HANDLE ExitEvent, HANDLE file_handle, HANDLE mutex_file, HANDLE event_player_2, SOCKET MainSocket, char game_file_name[])
 {
     int i = 0;
     DWORD dwEvent;
 
-    dwEvent = WaitForMultipleObjects(2, ThreadHandles, FALSE, INFINITE);
+
+	dwEvent = WaitForMultipleObjects(2, ThreadHandles, FALSE, THREAD_WAIT_TIME);
 
     if (WAIT_OBJECT_0 == dwEvent)
     {
@@ -118,21 +161,29 @@ int wait_for_threads_execution_and_free(HANDLE ThreadHandles[], SOCKET ThreadInp
     else
     {
         // Print Error message
-        WaitError(dwEvent);
+        //WaitError(dwEvent);
         // Free the threads which were dispatched, because some might have been
         for (i = 0; i < 2; i++)
         {
             if (ThreadHandles[i] != NULL)
             {
-                CloseHandle(ThreadHandles[i]);
+				TerminateThread(ThreadHandles[i], 0x555);
                 closesocket(ThreadInputs[i]);
                 printf("freed Thread number: %d\n", i + 1);
             }
         }
     }
-	CloseHandle(event_two_players);
-	CloseHandle(TwoPlayerEventThread);
-    //if (WSACleanup() == SOCKET_ERROR) printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
+	if (FALSE == (CloseHandle(event_two_players))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(TwoPlayerEventThread))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(ExitEvent))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(ExitThread))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(event_player_2))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(file_handle))) return STATUS_CODE_FAILURE;
+	if (FALSE == (DeleteFileA(game_file_name))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(mutex_file))) return STATUS_CODE_FAILURE;
+	if (0 == (closesocket(MainSocket))) return STATUS_CODE_FAILURE;
+
+	return SUCCESS_CODE;
 }
 
 
@@ -152,7 +203,6 @@ int WhatWasReceived(char* AcceptedStr)
 int ReadFromFile(HANDLE file_handle, char string[], int offset)
 {
 	char curr_char = '\0';
-	//HANDLE file_handle = GetFile(filename, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, OPEN_EXISTING);			//check for failures
 	int i = 0;
 	// offset string
 	DWORD dwPtr = SetFilePointer(file_handle, offset, NULL, FILE_BEGIN);
@@ -167,21 +217,20 @@ int ReadFromFile(HANDLE file_handle, char string[], int offset)
 		}
 
 		if (curr_char == '\r') string[i] = '\0';
-		else string[i] = curr_char;
+		else string[i] = curr_char;																					//Gotta fix here
 		i++;
 	}
 
 	//Success
-	//CloseHandle(file_handle);
 	return SUCCESS_CODE;
 }
 
 
 void GetClientName(char received_string[], char client_name[])
 {
-	int i;
+	unsigned int i;
 
-	for (i = 0; i < strlen(received_string) - strlen("CLIENT_REQUEST:") - 1 ; i++) client_name[i] = received_string[strlen("CLIENT_REQUEST:") + i];
+	for (i = 0; i < (strlen(received_string) - strlen("CLIENT_REQUEST:") - 1) ; i++) client_name[i] = received_string[strlen("CLIENT_REQUEST:") + i];
 
 	client_name[i] = '\r';
 	client_name[i + 1] = '\n';
@@ -206,12 +255,28 @@ int StringToFileWithCheck(HANDLE file_handle, char string[], int string_len)
 DWORD WINAPI TwoPlayerEventMonitor(LPVOID lpParam)
 {
 	TWO_PLAYER_THREAD* thread_params = (TWO_PLAYER_THREAD*)lpParam;
-	while (1)
+	while (WAIT_OBJECT_0 != WaitForSingleObject(*thread_params->p_ExitEvent, 0))
 	{
 		if (*thread_params->p_number_of_clients_connected == 2) SetEvent(*thread_params->p_event);
 		else if (*thread_params->p_number_of_clients_connected < 2) ResetEvent(*thread_params->p_event);
 		else printf("more than 2 clients have connected");
 	}
+	return SUCCESS_CODE;
+}
+
+
+DWORD WINAPI ExitMonitor(LPVOID lpParam)
+{
+	HANDLE* p_ExitEvent = (HANDLE*)lpParam;
+	ResetEvent(*p_ExitEvent);
+	char exit_word[5] = "exit";
+	char input_word[5] = "0000";
+	while (0 != strcmp(exit_word, input_word))
+	{
+		scanf_s("%s", input_word, 5);
+	}
+	SetEvent(*p_ExitEvent);
+	return SUCCESS_CODE;
 }
 
 
@@ -247,14 +312,17 @@ BOOL ThreadCommunicationProtocol(THREAD* thread_params, char string_to_write[], 
 			printf("Couldn't release Mutex");
 			return release_res;
 		}
-		Sleep(1000);
-		if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME)))
+		if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->event_player_2, INFINITE)))
 		{
-			printf("waited too long for mutex");
+			printf("waited too long for player 2 to write to file");
 			return FALSE;
 		}
-		ReadFromFile(*thread_params->file_handle, string_to_read, (strlen(string_to_write) + 1));
-		(*thread_params->stage_of_game)++;
+		if (WAIT_OBJECT_0 != (wait_res = WaitForSingleObject(*thread_params->p_mutex_file, THREAD_WAIT_TIME)))
+		{
+			printf("waited too long for file mutex");
+			return FALSE;
+		}
+		if (STATUS_CODE_FAILURE == ReadFromFile(*thread_params->file_handle, string_to_read, (strlen(string_to_write) + 1))) return STATUS_CODE_FAILURE;
 	}
 	else
 	{
@@ -263,20 +331,21 @@ BOOL ThreadCommunicationProtocol(THREAD* thread_params, char string_to_write[], 
 			printf("waited too long for mutex");
 			return FALSE;
 		}
-		ReadFromFile(*thread_params->file_handle, string_to_read, 0);
+		if (STATUS_CODE_FAILURE == ReadFromFile(*thread_params->file_handle, string_to_read, 0)) return STATUS_CODE_FAILURE;
 		if (STATUS_CODE_FAILURE == StringToFileWithCheck(*thread_params->file_handle, string_to_write, strlen(string_to_write) + 1)) return STATUS_CODE_FAILURE;
+		SetEvent(*thread_params->event_player_2);
 		if (FALSE == (release_res = ReleaseMutex(*thread_params->p_mutex_file)))
 		{
 			printf("Couldn't release Mutex");
 			return release_res;
 		}
 	}
+	return release_res;
 }
 
 //Service thread is the thread that opens for each successful client connection and "talks" to the client.
 DWORD WINAPI ServiceThread(LPVOID lpParam)
 {
-	char send_string[MAX_BYTES_SERVER_MIGHT_SEND];
 	char received_string[MAX_BYTES_SERVER_MIGHT_SEND];
 	char client_number[7] = "0000\r\n";
 	char opponent_number[7] = "0000\r\n";
@@ -287,13 +356,12 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 
 	char server_main_menu_str[] = "SERVER_MAIN_MENU\n",
 		server_approved_str[] = "SERVER_APPROVED\n",
-		server_denied_1_str[] = "SERVER_DENIED\n",
-		server_denied_2_str[] = "SERVER_DENIED\n",
 		server_invite[] = "SERVER_INVITE:",
 		server_invite_str[36],
 		server_setup_request_str[] = "SERVER_SETUP_REQUEST\n",
 		server_player_move_request_str[] = "SERVER_PLAYER_MOVE_REQUEST\n",
 		server_game_results_str[66],
+		server_win[38],
 		server_win_str[38],
 		server_draw_str[] = "SERVER_DRAW\n",
 		server_no_opponents_str[] = "SERVER_NO_OPPONENTS\n",
@@ -301,16 +369,13 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 
 	THREAD* thread_params = (THREAD*)lpParam;
 	printf("My thread ID is %d\n", thread_params->thread_id);
-	TransferResult_t SendRes;
-	TransferResult_t RecvRes;
 
-	int i = 0, game_state = I_START, game_result = GAME_CONTINUES;
+
+	unsigned int i = 0;
+	BOOL first_game = TRUE;
+	int game_state = I_START, game_result = GAME_CONTINUES;
 	int* p_game_result = &game_result;
-
-	SOCKET* ThreadInputs;
-
-	DWORD wait_res;
-	BOOL release_res;
+	int len_client = 0, len_opponent = 0;
 
 	while (game_state != CLIENT_DISCONNECT)
 	{
@@ -323,11 +388,10 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				{
 					if (NULL == (*thread_params->p_mutex_file = CreateMutex(NULL, TRUE, NULL))) CloseHandle(thread_params->p_mutex_file);  /// add a return
 				}
-				RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
 				printf("%s", received_string);
 				//Server approved
-				//strcpy_s(send_string, strlen(server_approved_str), server_approved_str);
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_approved_str);
+				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_approved_str))) return STATUS_CODE_FAILURE;
 				GetClientName(received_string, client_name);
 				game_state = WhatWasReceived(received_string);
 				break;
@@ -335,9 +399,20 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 			case CLIENT_REQUEST:
 			{
 				//Server Main Menu
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_main_menu_str);
-				//wait forever																								//Something special here?
-				RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_main_menu_str))) return STATUS_CODE_FAILURE;
+				//wait forever
+				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
+				printf("%s", received_string);
+				game_state = WhatWasReceived(received_string);
+				break;
+			}			
+			case SPECIAL_CLIENT_REQUEST:
+			{
+				//Server Main Menu
+				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_main_menu_str))) return STATUS_CODE_FAILURE;
+				//wait forever
+				(*thread_params->p_number_of_clients_connected)--;
+				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
 				printf("%s", received_string);
 				game_state = WhatWasReceived(received_string);
 				break;
@@ -350,13 +425,28 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				(*thread_params->p_number_of_clients_connected)++;
 				if (FALSE == PollTwoPlayers(thread_params, WAIT_FOR_OTHER_PLAYER_IN_MILLISECONDS, &game_state))
 				{
-					SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_no_opponents_str);
+					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_no_opponents_str))) return STATUS_CODE_FAILURE;
 				}
 				// Two opponents are connected
 				else
 				{
-					*thread_params->stage_of_game = 0;
-					ThreadCommunicationProtocol(thread_params, client_name, opponent_name, strlen(client_name) + 1, strlen(opponent_name) + 1);			//Find a better ending
+					if (first_game)
+					{
+						first_game = FALSE;
+						ThreadCommunicationProtocol(thread_params, client_name, opponent_name, strlen(client_name) + 1, strlen(opponent_name) + 1);			//Find a better ending
+					}
+					else
+					{
+						len_client = strlen(client_name);
+						len_opponent = strlen(opponent_name);
+						client_name[len_client] = '\r';
+						client_name[len_client + 1] = '\n';
+						client_name[len_client + 2] = '\0';
+						opponent_name[len_opponent] = '\r';
+						opponent_name[len_opponent + 1] = '\n';
+						opponent_name[len_opponent + 2] = '\0';
+						ThreadCommunicationProtocol(thread_params, client_name, opponent_name, strlen(client_name) + 1, strlen(opponent_name) + 1);			//Find a better ending
+					}
 
 					// Save opponents name
 					for (i = 0; i < strlen(server_invite); i++)
@@ -374,11 +464,11 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 
 					// Server invite
 					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
-					SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_invite_str);
+					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_invite_str))) return STATUS_CODE_FAILURE;
 					// Server Setup request
 					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
-					SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_setup_request_str);
-					RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_setup_request_str))) return STATUS_CODE_FAILURE;
+					if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
 					printf("%s", received_string);
 					// Copy the clients number including the NULL sign
 					for (i = 0; i < 5; i++) client_number[i] = received_string[i + 13];
@@ -395,8 +485,8 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 			case CLIENT_SETUP:
 			{
 				if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_player_move_request_str);
-				RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string);
+				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_player_move_request_str))) return STATUS_CODE_FAILURE;
+				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
 				printf("%s", received_string);
 				for (i = 0; i < 5; i++) client_guess[i] = received_string[i + 19];
 				client_guess[4] = '\r';
@@ -411,41 +501,43 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 			{
 				if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 				// Get server_game_results_str string or server_win_str string
-				GetGameResults(client_number, opponent_number, client_guess, opponent_guess, client_name, opponent_name, server_game_results_str, server_win_str, p_game_result);
+				GetGameResults(client_number, opponent_number, client_guess, opponent_guess, client_name, opponent_name, server_game_results_str, server_win, p_game_result);
 
 				if (game_result == GAME_WON)
 				{
-					(*thread_params->p_number_of_clients_connected)--;
-					SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_win_str);
-					game_state = CLIENT_REQUEST;
+					for (i = 0; i < strlen(server_win) - 1; i++) server_win_str[i] = server_win[i];
+					server_win_str[i] = ';';
+					for (i = 0; i < 4; i++) server_win_str[i + strlen(server_win)] = opponent_number[i];
+					server_win_str[i + strlen(server_win)] = '\n';
+					server_win_str[i + strlen(server_win) + 1] = '\0';
+
+					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_win_str))) return STATUS_CODE_FAILURE;
+					game_state = SPECIAL_CLIENT_REQUEST;
 				
 				}
 				else if (game_result == GAME_DRAW)
 				{
-					(*thread_params->p_number_of_clients_connected)--;
-					SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_draw_str);
-					game_state = CLIENT_REQUEST;
+					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_draw_str))) return STATUS_CODE_FAILURE;
+					game_state = SPECIAL_CLIENT_REQUEST;
 				}
 				else
 				{
-					SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_game_results_str);
+					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_game_results_str))) return STATUS_CODE_FAILURE;
 					game_state = CLIENT_SETUP;
 				}
 				break;
 			}
 			case OPPONENT_QUIT:
 			{
-				(*thread_params->p_number_of_clients_connected)--;
-				SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_opponent_quit_str);
-				game_state = CLIENT_REQUEST;
+				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_opponent_quit_str))) return STATUS_CODE_FAILURE;
+				game_state = SPECIAL_CLIENT_REQUEST;
 				break;
 			}
 		}
 		if (game_state == CLIENT_DISCONNECT)
 		{
-			(*thread_params->p_number_of_clients_connected)--;
-			// Only thread[0] opens the file
-			if (thread_params->thread_id == 0)
+			//(*thread_params->p_number_of_clients_connected)--;
+			if (thread_params->thread_id == 0)														///What to do ???
 			{
 				//close mutex
 				//close file
@@ -453,7 +545,7 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 		}
 		continue;
 	}
-	return 0;
+	return SUCCESS_CODE;
 }
 
 

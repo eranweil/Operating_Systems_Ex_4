@@ -51,7 +51,7 @@ DESCRIPTION - takes a guess and a target number, returns a string with the resul
 PARAMETERS -    char player_guess[]
 				char target_number[]
 
-RETURN - void
+RETURN - 4 char array with B/C/M for bull/cow/miss.
 	--------------------------------------------------------------------------------------------*/
 void CheckGuess(char player_guess[], char target_number[], char* res);
 
@@ -61,7 +61,7 @@ DESCRIPTION - takes an array holding results by chars and counts occurences of A
 
 PARAMETERS -    player_res[]
 
-RETURN - void
+RETURN - pointer to the number as char
 	--------------------------------------------------------------------------------------------*/
 void GetBullsOrCows(char player_res[], char A, char dest[]);
 
@@ -74,3 +74,4 @@ PARAMETERS -    raw[]
 RETURN - void
 	--------------------------------------------------------------------------------------------*/
 void CleanName(char raw[]);
+

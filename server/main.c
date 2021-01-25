@@ -5,16 +5,15 @@ main.c
 ----------------------------------------------------------------------------
 AUTHORS - Itamar Eyal 302309539 and Eran Weil 204051353
 
-PROJECT - Factori
+PROJECT - Server
 
-DESCRIPTION - This program can find the prime number building blocks for all of the numbers given in a task file by the user
+DESCRIPTION - This program functions as a server to clients in the BUlls and Cows game
 
 
 	consists of 4 main modules:
-		fileManager - handles files and cmd line args
-		threadManager - creates and handles threads
-		Lock - A module for all of the lock specific actions, comprising mostly of sync object actions
-		Queue - A module for all of the queue specific actions, comprising mostly of linked list actions
+		game - actual functionality of the game
+		threadManager - creates and handles threads and thread functions
+		SocketSendRecvTools - A module for all Socket connection and data transfer
 */
 
 //-------------------------------------------------------------//
@@ -69,26 +68,32 @@ int main(int argc, char** argv)
 	char server_ip[] = "127.0.0.1";
 	char server_port[] = "8888";
 	char game_file_name[]= "GameSession.txt";
-	char event_name[] = "TWO_PLAYER_EVENT";
+	char two_player_event_name[] = "TWO_PLAYER_EVENT";
+	char event_player_2_name[] = "PLATER_TWO_EVENT";
+	char exit_event_name[] = "EXIT_EVENT";
+	char server_denied_str[] = "SERVER_DENIED\n";
 	int i = 0;
 	int j = 0;
 	for (i = 0; i < 4; i++) server_port[i] = *((*(argv + 1)) + i);
 
 	int number_of_clients_connected = 0;
 	int* p_number_of_clients_connected = &number_of_clients_connected;
-	int stage_of_game = 0;
+	int mode_res = 0;
 	int server_port_num = atoi(server_port);
-	int* p_stage_of_game = &stage_of_game;
 
 	HANDLE ThreadHandles[NUM_OF_WORKER_THREADS];
 	HANDLE TwoPlayerEventThread;
-	SOCKET ThreadInputs[NUM_OF_WORKER_THREADS];
-	HANDLE file_handle;
-
-	HANDLE mutex_file;
-	HANDLE event_two_players;
+	HANDLE ExitThread = NULL;
+	HANDLE ExitEvent = NULL;
+	HANDLE file_handle = NULL;
+	HANDLE mutex_file = NULL;
+	HANDLE event_two_players = NULL;
+	HANDLE event_player_2 = NULL;
 
 	SOCKET MainSocket = INVALID_SOCKET;
+	SOCKET AcceptSocket = INVALID_SOCKET;
+	SOCKET ThreadInputs[NUM_OF_WORKER_THREADS];
+
 	unsigned long Address;
 	SOCKADDR_IN service;
 	int bindRes;
@@ -102,6 +107,9 @@ int main(int argc, char** argv)
 	TWO_PLAYER_THREAD* p_two_player_data = &two_player_data;
 	DWORD dwThreadId[NUM_OF_WORKER_THREADS];
 	DWORD dwTwoPlayerEventThreadId;
+
+	u_long socket_non_blocking_mode = 1, socket_blocking_mode = 0;
+
 
 	// Check args given
 	if (STATUS_CODE_FAILURE == check_arguments(argc, argv)) return ERROR_CODE_ARGS;
@@ -168,11 +176,24 @@ int main(int argc, char** argv)
 	event_two_players = CreateEvent(
 		NULL,					/* default security attributes */
 		TRUE,					/* manual-reset event */
-		FALSE,					/* initial state is non-signaled */
-		event_name);			/* name */
+		FALSE,					/* initial state is signaled */
+		two_player_event_name);			/* name */
+
+	ExitEvent = CreateEvent(
+		NULL,					/* default security attributes */
+		TRUE,					/* manual-reset event */
+		FALSE,					/* initial state is signaled */
+		exit_event_name);		/* name */
+
+	event_player_2 = CreateEvent(
+		NULL,					/* default security attributes */
+		FALSE,					/* manual-reset event */
+		FALSE,					/* initial state is signaled */
+		event_player_2_name);	/* name */
 
 	p_two_player_data->p_number_of_clients_connected = p_number_of_clients_connected;
 	p_two_player_data->p_event = &event_two_players;
+	p_two_player_data->p_ExitEvent = &ExitEvent;
 
 	TwoPlayerEventThread = CreateThread(
 		NULL,
@@ -183,16 +204,33 @@ int main(int argc, char** argv)
 		&dwTwoPlayerEventThreadId
 	);
 
+	ExitThread = CreateThread(
+		NULL,
+		0,
+		ExitMonitor,
+		&ExitEvent,
+		0,
+		&dwTwoPlayerEventThreadId
+	);
+
 	// Initialize all thread handles to NULL, to mark that they have not been initialized
 	for (i = 0; i < NUM_OF_WORKER_THREADS; i++) ThreadHandles[i] = NULL;
 
 	printf("Waiting for a client to connect...\n");
 
-	for (j = 0; j < MAX_LOOPS; j++)																//(while no quit)
+	if (NO_ERROR != (mode_res = ioctlsocket(MainSocket, FIONBIO, &socket_non_blocking_mode)));
 	{
-		SOCKET AcceptSocket = accept(MainSocket, NULL, NULL);
+		//printf("ioctlsocket failed with error: %ld\n", mode_res);
+		// Close handles?
+	}
+
+	while (WAIT_OBJECT_0 != WaitForSingleObject(ExitEvent, 0))
+	{
+		AcceptSocket = accept(MainSocket, NULL, NULL);
 		if (AcceptSocket == INVALID_SOCKET)
 		{
+			if (WSAEWOULDBLOCK == WSAGetLastError())// no accept - loop again
+				continue;
 			printf("Accepting connection with client failed, error %ld\n", WSAGetLastError());
 			for (i = 0; i < NUM_OF_WORKER_THREADS; i++)
 			{
@@ -208,10 +246,17 @@ int main(int argc, char** argv)
 						ThreadHandles[i] = NULL;
 						break;
 					}
-					else printf("Waiting for thread failed. Ending program\n");					//better response - terminate brutally
-					return;
+					else printf("Waiting for thread failed. Ending program\n");
+					break;
 				}
 			}
+		}
+
+		//Blocking socket - it is a worker
+		if (NO_ERROR != (mode_res = ioctlsocket(AcceptSocket, FIONBIO, &socket_blocking_mode)));
+		{
+			printf("ioctlsocket failed with error: %ld\n", mode_res);
+			// Close handles?
 		}
 
 		printf("Client Connected.\n");
@@ -237,8 +282,9 @@ int main(int argc, char** argv)
 		if (i == NUM_OF_WORKER_THREADS) //no slot is available
 		{
 			printf("No slots available for client, dropping the connection.\n");
-			// send a message on the socket that connection was denied----------------------------------------------------------------------------//
+			SendData(AcceptSocket, server_denied_str);
 			closesocket(AcceptSocket); //Closing the socket, dropping the connection.
+			continue;
 		}
 		else
 		{
@@ -253,9 +299,9 @@ int main(int argc, char** argv)
 				pData_0->p_mutex_file = &mutex_file;
 				pData_0->p_event = &event_two_players;
 				pData_0->file_handle = &file_handle;
+				pData_0->event_player_2 = &event_player_2;
 				pData_0->tasks_file_name = game_file_name;
 				pData_0->thread_id = i;
-				pData_0->stage_of_game = p_stage_of_game;
 				pData_0->p_number_of_clients_connected = p_number_of_clients_connected;
 
 				ThreadHandles[i] = CreateThread(
@@ -274,9 +320,9 @@ int main(int argc, char** argv)
 				pData_1->p_mutex_file = &mutex_file;
 				pData_1->p_event = &event_two_players;
 				pData_1->file_handle = &file_handle;
+				pData_1->event_player_2 = &event_player_2;
 				pData_1->tasks_file_name = game_file_name;
 				pData_1->thread_id = i;
-				pData_1->stage_of_game = p_stage_of_game;
 				pData_1->p_number_of_clients_connected = p_number_of_clients_connected;
 
 				ThreadHandles[i] = CreateThread(
@@ -293,29 +339,22 @@ int main(int argc, char** argv)
 			if (NULL == ThreadHandles[i])
 			{
 				printf("Brutally terminating the program due to thread dispatch issues");
-				if (STATUS_CODE_FAILURE == (wait_for_threads_execution_and_free(ThreadHandles, ThreadInputs, event_two_players, TwoPlayerEventThread)))
-				{
-					printf("There was a wait error while we waited for all of the threads");
-					return STATUS_CODE_FAILURE;
-				}
-				return STATUS_CODE_FAILURE;
+				break;
 			}
 			//Else
-			printf("dispatched sending Thread\n");
+			printf("dispatched Thread\n");
 
 		}
-	} 	//(while no quit)
+	} 	//(while no exit)
 
-		// escorting the threads for exit
-	if (STATUS_CODE_FAILURE == (wait_for_threads_execution_and_free(ThreadHandles, ThreadInputs, event_two_players, TwoPlayerEventThread)))
+		// escorting all handles, sockets and threads for exit
+	if (STATUS_CODE_FAILURE == (FreeAll(ThreadHandles, ThreadInputs, event_two_players, TwoPlayerEventThread, ExitThread, ExitEvent, file_handle, mutex_file, event_player_2, MainSocket, game_file_name)))
 	{
-		printf("There was a wait error while we waited for all of the threads");
 		return STATUS_CODE_FAILURE;
 	}
 
 	// Success
-	printf("freed all threads\n");
-	if (closesocket(MainSocket) == SOCKET_ERROR) printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
+	printf("freed all threads, closed all handles and Sockets\n");
 	if (WSACleanup() == SOCKET_ERROR) printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
 	return SUCCESS_CODE;
 

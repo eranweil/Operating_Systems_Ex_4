@@ -9,6 +9,14 @@ Contains specific measured sizes, exit codes and structures of the project.
 //-------------------------------------------------------------//
 // --------------------------DEFINES-------------------------- //
 //-------------------------------------------------------------//
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#include <string.h>
+
+
+//-------------------------------------------------------------//
+// ----------------------LIBRARY INCLUDES--------------------- //
+//-------------------------------------------------------------//
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <string.h>
 #include <winsock2.h>
 #include <Windows.h>
@@ -17,6 +25,7 @@ Contains specific measured sizes, exit codes and structures of the project.
 #include <limits.h>
 #include <stdbool.h>
 #include <math.h>
+
 
 // Exit codes
 #define SUCCESS_CODE							0 
@@ -48,6 +57,7 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define CLIENT_SETUP                            2
 #define CLIENT_PLAYER_MOVE                      3
 #define CLIENT_DISCONNECT                       4
+#define SPECIAL_CLIENT_REQUEST                  5
 
 // special codes
 #define I_START                                 21
@@ -79,7 +89,7 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define MAX_LOOPS                               3
 #define MAX_BYTES_SERVER_MIGHT_SEND             66
 #define MAX_BYTES_CLIENT_MIGHT_SEND             27         
-#define THREAD_WAIT_TIME                        1000000
+#define THREAD_WAIT_TIME                        100000000
 #define WAIT_FOR_OTHER_PLAYER_IN_MILLISECONDS   15000
 #define POLL_EVENT_STATUS                       0
 
@@ -99,9 +109,9 @@ struct Thread
     HANDLE* p_mutex_file;
     HANDLE* p_event;
     HANDLE* file_handle;
+    HANDLE* event_player_2;
     char* tasks_file_name;
     int thread_id;
-    int* stage_of_game;
     int* p_number_of_clients_connected;
 };
 typedef struct Thread THREAD;
@@ -109,6 +119,7 @@ typedef struct Thread THREAD;
 struct TwoPlayerThread
 {
     HANDLE* p_event;
+    HANDLE* p_ExitEvent;
     int* p_number_of_clients_connected;
 };
 typedef struct TwoPlayerThread TWO_PLAYER_THREAD;

@@ -3,31 +3,15 @@ main.c
 ----------------------------------------------------------------------------
 AUTHORS - Itamar Eyal 302309539 and Eran Weil 204051353
 
-PROJECT - Factori
+PROJECT - Client
 
-DESCRIPTION - This program can find the prime number building blocks for all of the numbers given in a task file by the user
+DESCRIPTION - This program generates the client side in the Bulls and Cows game
 
 
-    consists of 4 main modules:
-        fileManager - handles files and cmd line args
-        threadManager - creates and handles threads
-        Lock - A module for all of the lock specific actions, comprising mostly of sync object actions
-        Queue - A module for all of the queue specific actions, comprising mostly of linked list actions
+    consists of 2 main modules:
+        threadManager - creates and handles threads and thread functions
+        SocketSendRecvTools - A module for all Socket connection and data transfer
 */
-
-//-------------------------------------------------------------//
-// ----------------------LIBRARY INCLUDES--------------------- //
-//-------------------------------------------------------------//
-
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include <string.h>
-#include <winsock2.h>
-#include <Windows.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <math.h>
 
 //-------------------------------------------------------------//
 // ----------------------PROJECT INCLUDES--------------------- //
@@ -35,158 +19,6 @@ DESCRIPTION - This program can find the prime number building blocks for all of 
 
 #include "HardCodedData.h"
 #include "threadManager.h"
-
-
-void GameState(SOCKET* m_socket, SOCKADDR_IN* p_clientService, int* p_game_state, char user_input[], char send_string[], char received_string[], char server_ip[], char server_port[], int* p_opponent_name_len, char winners_name[], char opponent_username[], char bulls[], char cows[], char opponent_guess[])
-{
-    int res = 0;
-    switch (*p_game_state)
-    {
-        case I_START:
-        {
-            printf("Connected to server on %s:%s\nType in your name:\n", server_ip, server_port);
-            DefineStringToSend(*p_game_state, user_input, send_string);
-            //res = send(*m_socket, "ABCDEFG", 8, 0);
-            SendData(*m_socket, send_string);
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;
-        }
-        case SERVER_APPROVED:
-        {
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = SERVER_MAIN_MENU;
-            break;
-        }
-        case SERVER_MAIN_MENU:
-        {
-            printf("Choose what to do next:\n1. Play against another client\n2. Quit\n");
-            DefineStringToSend(*p_game_state, user_input, send_string);
-            SendData(*m_socket, send_string);
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_NO_OPPONENTS:
-        {
-            printf("There are currently no opponents available\n");
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = SERVER_MAIN_MENU;
-            break;
-        }
-        case SERVER_INVITE:
-        {
-            OpponentNameLenInBytes(received_string, p_opponent_name_len);
-            printf("Game is on!\n");
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_SETUP_REQUEST:
-        {
-            printf("Choose your 4 digits:\n");
-            DefineStringToSend(*p_game_state, user_input, send_string);
-            SendData(*m_socket, send_string);
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_PLAYER_MOVE_REQUEST:
-        {
-            printf("Choose your guess:\n");
-            DefineStringToSend(*p_game_state, user_input, send_string);
-            SendData(*m_socket, send_string);
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_GAME_RESULTS:
-        {
-            BreakDownGameResultsString(received_string, bulls, cows, opponent_username, opponent_guess, *p_opponent_name_len);
-            printf("Bulls: %s\nCows: %s\n%s played: %s\n", bulls, cows, opponent_username, opponent_guess);
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_WIN:
-        {
-            GetWinnersNameAndOpponentsGuess(received_string, winners_name, opponent_guess);
-            printf("%s won!\nopponents number was %s\n", winners_name, opponent_guess);
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_DRAW:
-        {
-            printf("It’s a tie");
-            RecvData(*m_socket, received_string);
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_OPPONENT_QUIT:
-        {
-            printf("Opponent quit.");
-            RecvData(*m_socket, received_string);                   //What to do? restart game?
-            printf("%s", received_string);
-            *p_game_state = WhatWasReceived(received_string);
-            break;        
-        }
-        case SERVER_DENIED:
-        {
-            closesocket(*m_socket);
-            printf("Server on %s:%s denied the connection request.\nChoose what to do next:\n1. Try to reconnect\n2. Exit\n", server_ip, server_port);
-            GetStringFromClient(user_input);
-            while (atoi(user_input) < 1 || atoi(user_input) > 2)
-            {
-                printf("You need to choose either '1' or '2'. Other options are unacceptable\n");
-                GetStringFromClient(user_input);
-            }
-            if (user_input[0] == '1')
-            {
-                if (connect(*m_socket, (SOCKADDR*)p_clientService, sizeof(*p_clientService)) == SOCKET_ERROR) *p_game_state = I_FAIL;
-                else *p_game_state = I_START;
-            }
-            if (user_input[0] == '2')
-            {
-                *p_game_state = I_QUIT;
-            }
-            break;       
-        }
-        case I_FAIL:
-        {
-            while (connect(*m_socket, (SOCKADDR*)p_clientService, sizeof(*p_clientService)) == SOCKET_ERROR)
-            {
-                printf("Failed connecting to server on %s:%s.\nChoose what to do next:\n1. Try to reconnect\n2. Exit\n", server_ip, server_port);
-                GetStringFromClient(user_input);
-
-                while (atoi(user_input) < 1 || atoi(user_input) > 2)
-                {
-                    printf("You need to choose either '1' or '2'. Other options are unacceptable\n");
-                    GetStringFromClient(user_input);
-                }
-                if (user_input[0] == '1') continue;
-                if (user_input[0] == '2')
-                {
-                    *p_game_state = I_QUIT;
-                    break;
-                }
-            }
-            *p_game_state = I_START;
-            break;
-        }
-    }
-    return;
-}
 
 int check_arguments(int argc, char** argv)
 {
@@ -211,6 +43,7 @@ int check_arguments(int argc, char** argv)
     }
     return SUCCESS_CODE;
 }
+
 
 int main(int argc, char** argv)
 {
@@ -279,10 +112,10 @@ int main(int argc, char** argv)
     
     while (game_state != I_QUIT)
     {
-        GameState(&m_socket, &clientService, p_game_state, user_input, send_string, received_string, server_ip, server_port, p_opponent_name_len, winners_name, opponent_username, bulls, cows, opponent_guess);
+        if (STATUS_CODE_FAILURE == GameState(&m_socket, &clientService, p_game_state, user_input, send_string, received_string, server_ip, server_port, p_opponent_name_len, winners_name, opponent_username, bulls, cows, opponent_guess)) game_state = I_FAIL;
     }
 
-    closesocket(m_socket);
-
+    //Socket closed inside the game - no exiting game without closing socket
+    if (WSACleanup() == SOCKET_ERROR) printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
     return SUCCESS_CODE;
 }
