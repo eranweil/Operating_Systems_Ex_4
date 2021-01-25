@@ -19,7 +19,7 @@ bulls & cows functions
 //-------------------------------------------------------------//
 
 #include "threadManager.h"
-#include "HardCodedData.h"
+#include "../share/HardCodedData.h"
 
 //---------------------------------------------------------------//
 // -------------------------DECLARATIONS------------------------ //
@@ -51,9 +51,9 @@ DESCRIPTION - takes a guess and a target number, returns a string with the resul
 PARAMETERS -    char player_guess[]
 				char target_number[]
 
-RETURN - 4 char array with B/C/M for bull/cow/miss.
+RETURN - void
 	--------------------------------------------------------------------------------------------*/
-char* CheckGuess(char player_guess[], char target_number[]);
+void CheckGuess(char player_guess[], char target_number[], char* res);
 
 
 /*--------------------------------------------------------------------------------------------
@@ -61,6 +61,16 @@ DESCRIPTION - takes an array holding results by chars and counts occurences of A
 
 PARAMETERS -    player_res[]
 
-RETURN - pointer to the number as char
+RETURN - void
 	--------------------------------------------------------------------------------------------*/
-char* GetBullsOrCows(char player_res[], char A);
+void GetBullsOrCows(char player_res[], char A, char dest[]);
+
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - clears \r\n from array
+
+PARAMETERS -    raw[]
+
+RETURN - void
+	--------------------------------------------------------------------------------------------*/
+void CleanName(char raw[]);

@@ -60,7 +60,7 @@ PARAMETERS -    char player_guess[]
 
 RETURN - 4 char array with B/C/M for bull/cow/miss.
 	--------------------------------------------------------------------------------------------*/
-char* CheckGuess(char player_guess[], char target_number[]);
+void CheckGuess(char player_guess[], char target_number[], char* res);
 
 
 /*--------------------------------------------------------------------------------------------
@@ -70,12 +70,24 @@ PARAMETERS -    player_res[]
 
 RETURN - pointer to the number as char
 	--------------------------------------------------------------------------------------------*/
-char* GetBullsOrCows(char player_res[], char A);
+void GetBullsOrCows(char player_res[], char A, char dest[]);
+
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - clears \r\n from array
+
+PARAMETERS -    raw[]
+
+RETURN - void
+	--------------------------------------------------------------------------------------------*/
+void CleanName(char raw[]);
+
 
 
 //---------------------------------------------------------------//
 // ----------------------IMPLEMENTATIONS------------------------ //
 //---------------------------------------------------------------//
+
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - takes guesses and numbers of the client and it's opponent. declares a winner/draw if there is one. otherwise let's the
@@ -114,16 +126,26 @@ void GetGameResults(char client_number[], char opponent_number[], char client_gu
 	char server_game_results[] = "SERVER_GAME_RESULTS:";
 	char server_win[] = "SERVER_WIN:";
 
-	char* client_res = CheckGuess(client_guess, opponent_number);
-	char* opponenet_res = CheckGuess(opponent_guess, client_number);
+	CleanName(client_name);
+	CleanName(client_number);
+	CleanName(client_guess);
+
+	char client_res[5] = "MMMM";
+	CheckGuess(client_guess, opponent_number, client_res);
+	char opponenet_res[5] = "MMMM";
+	CheckGuess(opponent_guess, client_number, opponenet_res);
 
 	client_win = strcmp(client_res, victory) == 0;
 	opponent_win = strcmp(opponenet_res, victory) == 0;
 
-	char *client_bulls = GetBullsOrCows(client_res, 'B');
-	char *client_cows = GetBullsOrCows(client_res, 'C');
-	char *oponnent_bulls = GetBullsOrCows(opponenet_res, 'B');
-	char *oponnent_cows = GetBullsOrCows(opponenet_res, 'C');
+	char client_bulls[2] = "0";
+	GetBullsOrCows(client_res, 'B', client_bulls);
+	char client_cows[2] = "0";
+	GetBullsOrCows(client_res, 'C', client_cows);
+	char oponnent_bulls[2] = "0";
+	GetBullsOrCows(opponenet_res, 'B', oponnent_bulls);
+	char oponnent_cows[2] = "0";
+	GetBullsOrCows(opponenet_res, 'C', oponnent_cows);
 
 	game = client_win + opponent_win;
 
@@ -134,24 +156,27 @@ void GetGameResults(char client_number[], char opponent_number[], char client_gu
 			for (i = 0; i < strlen(server_game_results); i++) server_game_results_str[i] = server_game_results[i];
 			for (i = 0; i < strlen(client_bulls); i++) server_game_results_str[i + strlen(server_game_results)] = client_bulls[i];
 			server_game_results_str[i + strlen(server_game_results)] = ';';
-			for (i = 0; i < strlen(client_cows); i++) server_game_results_str[i + 1 + strlen(server_game_results) + strlen(client_bulls)] = client_bulls[i];
+			for (i = 0; i < strlen(client_cows); i++) server_game_results_str[i + 1 + strlen(server_game_results) + strlen(client_bulls)] = client_cows[i];
 			server_game_results_str[i + 1 + strlen(server_game_results) + strlen(client_bulls)] = ';';
-			for (i = 0; i < strlen(opponent_name); i++) server_game_results_str[i + 2 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows)] = client_bulls[i];
+			for (i = 0; i < strlen(opponent_name); i++) server_game_results_str[i + 2 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows)] = opponent_name[i];
 			server_game_results_str[i + 2 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows)] = ';';
-			for (i = 0; i < strlen(opponent_guess); i++) server_game_results_str[i + 3 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows) + strlen(opponent_name)] = client_bulls[i];
-			server_game_results_str[i + 3 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows) + strlen(opponent_name)] = '\0';
+			for (i = 0; i < strlen(opponent_guess); i++) server_game_results_str[i + 3 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows) + strlen(opponent_name)] = opponent_guess[i];
+			server_game_results_str[i + 3 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows) + strlen(opponent_name)] = '\n';
+			server_game_results_str[i + 4 + strlen(server_game_results) + strlen(client_bulls) + strlen(client_cows) + strlen(opponent_name)] = '\0';
 			break;
 
 		case 1: // we have a winner!
 			if (client_win) {
 				for (i = 0; i < strlen(server_win); i++) server_win_str[i] = server_win[i];
 				for (i = 0; i < strlen(client_name); i++) server_win_str[i + strlen(server_win)] = client_name[i];
-				server_win_str[i + strlen(server_win)] = '\0';
+				server_win_str[i + strlen(server_win)] = '\n';
+				server_win_str[i + 1 + strlen(server_win)] = '\0';
 			}
 			else { // opponent wins
 				for (i = 0; i < strlen(server_win); i++) server_win_str[i] = server_win[i];
 				for (i = 0; i < strlen(opponent_name); i++) server_win_str[i + strlen(server_win)] = opponent_name[i];
-				server_win_str[i + strlen(server_win)] = '\0';
+				server_win_str[i + strlen(server_win)] = '\n';
+				server_win_str[i + 1 + strlen(server_win)] = '\0';
 			}
 			*p_game_result = GAME_WON;
 			break;
@@ -163,6 +188,7 @@ void GetGameResults(char client_number[], char opponent_number[], char client_gu
 }
 
 
+
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - takes a guess and a target number, returns a string with the result. win is 'BBBB'
 
@@ -171,8 +197,8 @@ PARAMETERS -    char player_guess[]
 
 RETURN - 4 char array with B/C/M for bull/cow/miss. 
 	--------------------------------------------------------------------------------------------*/
-char* CheckGuess(char player_guess[], char target_number[]) {
-	char res[5] = "MMMM";
+void CheckGuess(char player_guess[], char target_number[], char* res) {
+
 	int i, j;
 
 	for (i = 0; i < 4; i++) {
@@ -186,7 +212,7 @@ char* CheckGuess(char player_guess[], char target_number[]) {
 				res[i] = 'C'; // cow
 		}
 	}
-	return res;
+	res[i++] = '\0';
 }
 
 
@@ -197,15 +223,30 @@ PARAMETERS -    player_res[]
 
 RETURN - pointer to the number as char
 	--------------------------------------------------------------------------------------------*/
-char *GetBullsOrCows(char player_res[], char A) {
+void GetBullsOrCows(char player_res[], char A, char dest[]) {
 	int i;
 	int count = 0;
-	char res[2] = "0";
+
 	for (i = 0; i < 4; i++) {
 		if (player_res[i] == A)
 			count++;
 	}
-	res[0] = (count + '0');
-	res[1] = '\0';
-	return res;
+	dest[0] = (count + '0');
+	dest[1] = '\0';
+}
+
+
+/*--------------------------------------------------------------------------------------------
+DESCRIPTION - clears \r\n from array
+
+PARAMETERS -    raw[]
+
+RETURN - void
+	--------------------------------------------------------------------------------------------*/
+void CleanName(char raw[]) {
+	for (int i = 0, j = 0; raw[i] != '\0'; i++)
+		if ((raw[i] != '\r') && (raw[i] != '\n'))
+			raw[j++] = raw[i];
+		else
+			raw[j++] = '\0';
 }
