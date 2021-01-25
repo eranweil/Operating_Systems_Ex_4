@@ -37,32 +37,31 @@ TransferResult_t SendBuffer( const char* Buffer, int BytesToSend, SOCKET sd )
 
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
-TransferResult_t SendString( const char *Str, SOCKET sd )
+TransferResult_t SendString(const char* Str, SOCKET sd)
 {
 	/* Send the the request to the server on socket sd */
 	int TotalStringSizeInBytes;
 	TransferResult_t SendRes;
 
-	/* The request is sent in two parts. First the Length of the string (stored in 
+	/* The request is sent in two parts. First the Length of the string (stored in
 	   an int variable ), then the string itself. */
-		
-	TotalStringSizeInBytes = (int)( strlen(Str) + 1 ); // terminating zero also sent	
 
-	SendRes = SendBuffer( 
-		(const char *)( &TotalStringSizeInBytes ),
-		(int)( sizeof(TotalStringSizeInBytes) ), // sizeof(int) 
-		sd );
+	TotalStringSizeInBytes = (int)(strlen(Str) + 1); // terminating zero also sent	
 
-	if ( SendRes != TRNS_SUCCEEDED ) return SendRes ;
+	SendRes = SendBuffer(
+		(const char*)(&TotalStringSizeInBytes),
+		(int)(sizeof(TotalStringSizeInBytes)), // sizeof(int) 
+		sd);
 
-	SendRes = SendBuffer( 
-		(const char *)( Str ),
-		(int)( TotalStringSizeInBytes ), 
-		sd );
+	if (SendRes != TRNS_SUCCEEDED) return SendRes;
+
+	SendRes = SendBuffer(
+		(const char*)(Str),
+		(int)(TotalStringSizeInBytes),
+		sd);
 
 	return SendRes;
 }
-
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
 
 TransferResult_t ReceiveBuffer( char* OutputBuffer, int BytesToReceive, SOCKET sd )
@@ -75,6 +74,7 @@ TransferResult_t ReceiveBuffer( char* OutputBuffer, int BytesToReceive, SOCKET s
 	{
 		/* send does not guarantee that the entire message is sent */
 		BytesJustTransferred = recv(sd, CurPlacePtr, RemainingBytesToReceive, 0);
+
 		if ( BytesJustTransferred == SOCKET_ERROR ) 
 		{
 			printf("recv() failed, error %d\n", WSAGetLastError() );
@@ -128,56 +128,39 @@ TransferResult_t ReceiveString(char received_string[], SOCKET sd )
 
 
 
-DWORD WINAPI RecvData(SOCKET* m_socket, char received_string[])
+DWORD WINAPI RecvData(SOCKET m_socket, char received_string[])
 {
 
 	TransferResult_t RecvRes;
-	DWORD wait_res;
-	BOOL release_res;
+	
+	RecvRes = ReceiveString(received_string, m_socket);
 
-	while (1)
+	if (RecvRes == TRNS_FAILED)
 	{
-		RecvRes = ReceiveString(received_string, *m_socket);
-
-		if (RecvRes == TRNS_FAILED)
-		{
-			printf("Socket error while trying to read data from socket\n");
-			return 0x555;
-		}
-		else if (RecvRes == TRNS_DISCONNECTED)
-		{
-			printf("Server closed connection. Bye!\n");
-			return 0x555;
-		}
-		else
-		{
-			return SUCCESS_CODE;
-		}
+		printf("Socket error while trying to read data from socket\n");
+		return 0x555;
 	}
-
+	else if (RecvRes == TRNS_DISCONNECTED)
+	{
+		printf("Server closed connection. Bye!\n");
+		return 0x555;
+	}
+	else
+	{
+		return SUCCESS_CODE;
+	}
 }
 
 
-DWORD WINAPI SendData(SOCKET* m_socket, char send_string[])
+DWORD WINAPI SendData(SOCKET m_socket, char send_string[])
 {
 
 	TransferResult_t SendRes;
-	DWORD wait_res;
-	BOOL release_res;
 
-	char string_received[5] = NULL;
-	char string_to_send[37] = NULL;
-
-	while (1)
+	if ((SendRes = SendString(send_string, m_socket)) == TRNS_FAILED)
 	{
-
-		SendRes = SendString(send_string, *m_socket);
-
-		if (SendRes == TRNS_FAILED)
-		{
 			printf("Socket error while trying to write data to socket\n");
 			return 0x555;
-		}
 	}
 }
 

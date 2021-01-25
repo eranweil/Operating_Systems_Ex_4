@@ -141,16 +141,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\share\SocketSendRecvTools.c" />
-    <ClCompile Include="fileManager.c" />
-    <ClCompile Include="Lock.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="threadManager.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\share\HardCodedData.h" />
     <ClInclude Include="..\share\SocketSendRecvTools.h" />
-    <ClInclude Include="fileManager.h" />
-    <ClInclude Include="Lock.h" />
     <ClInclude Include="threadManager.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

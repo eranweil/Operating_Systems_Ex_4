@@ -82,7 +82,7 @@ TransferResult_t ReceiveBuffer( char* OutputBuffer, int RemainingBytesToReceive,
  * TRNS_DISCONNECTED - if the socket was disconnected
  * TRNS_FAILED - otherwise
  */ 
-TransferResult_t ReceiveString( char** OutputStrPtr, SOCKET sd );
+TransferResult_t ReceiveString(char received_string[], SOCKET sd);
 
 
 /*oOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoOoO*/
@@ -95,7 +95,7 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI RecvData(SOCKET* m_socket, char received_string[]);
+DWORD WINAPI RecvData(SOCKET m_socket, char received_string[]);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - Function every new thread is called to. reads a task from the task file, breaks into primes and prints the correct string to the tasks file. uses a lock regiment as specified
@@ -104,7 +104,7 @@ PARAMETERS - lpParam: holds the data structure of pData for that thread
 
 RETURN - signal exit code.
     --------------------------------------------------------------------------------------------*/
-DWORD WINAPI SendData(SOCKET* m_socket, char send_string[]);
+DWORD WINAPI SendData(SOCKET m_socket, char send_string[]);
 
 
 #endif // SOCKET_SEND_RECV_TOOLS_H

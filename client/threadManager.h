@@ -22,7 +22,6 @@ All thread related actions header file
 // ----------------------PROJECT INCLUDES--------------------- //
 //-------------------------------------------------------------//
 
-#include "fileManager.h"
 #include "SocketSendRecvTools.h"
 #include "HardCodedData.h"
 
@@ -51,7 +50,7 @@ PARAMETERS - p_threads - an array of thread handles
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket);
+void wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - the mother function which dispatches the threads and waits for them to finish their good work.

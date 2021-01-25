@@ -35,7 +35,7 @@ PARAMETERS - p_threads - an array of thread handles
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket);
+void wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - the mother function which dispatches the threads and waits for them to finish their good work.
@@ -102,7 +102,7 @@ void WaitError(DWORD wait_res)
 }
 
 
-int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
+void wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
 {
     int i = 0;
     DWORD dwEvent;
@@ -122,7 +122,7 @@ int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
     else
     {
         // Print Error message
-        WaitError(dwEvent, 0);
+        WaitError(dwEvent);
         // Free the threads which were dispatched, because some might have been
         for (i = 0; i < 2; i++)
         {
@@ -141,17 +141,17 @@ int wait_for_threads_execution_and_free(HANDLE hThread[], SOCKET* m_socket)
 
 int WhatWasReceived(char received_string[])
 {
-    if (0 == strcmp(received_string, "SERVER_MAIN_MENU")) return SERVER_MAIN_MENU;
-    if (0 == strcmp(received_string, "SERVER_APPROVED")) return SERVER_APPROVED;
-    if (0 == strcmp(received_string, "SERVER_INVITE")) return SERVER_INVITE;
-    if (0 == strcmp(received_string, "SERVER_SETUP_REQUEST")) return SERVER_SETUP_REQUEST;
-    if (0 == strcmp(received_string, "SERVER_PLAYER_MOVE_REQUEST")) return SERVER_PLAYER_MOVE_REQUEST;
-    if (0 == strcmp(received_string, "SERVER_GAME_RESULTS")) return SERVER_GAME_RESULTS;
-    if (0 == strcmp(received_string, "SERVER_WIN")) return SERVER_WIN;
-    if (0 == strcmp(received_string, "SERVER_DRAW")) return SERVER_DRAW;
-    if (0 == strcmp(received_string, "SERVER_NO_OPPONENTS")) return SERVER_NO_OPPONENTS;
-    if (0 == strcmp(received_string, "SERVER_OPPONENT_QUIT")) return SERVER_OPPONENT_QUIT;
-    if (0 == strcmp(received_string, "SERVER_DENIED")) return SERVER_DENIED;
+    if (0 == strncmp(received_string, "SERVER_MAIN_MENU", strlen("SERVER_MAIN_MENU") - 2)) return SERVER_MAIN_MENU;
+    if (0 == strncmp(received_string, "SERVER_APPROVED", strlen("SERVER_APPROVED") - 2)) return SERVER_APPROVED;
+    if (0 == strncmp(received_string, "SERVER_INVITE", strlen("SERVER_INVITE") - 2)) return SERVER_INVITE;
+    if (0 == strncmp(received_string, "SERVER_SETUP_REQUEST", strlen("SERVER_SETUP_REQUEST") - 2)) return SERVER_SETUP_REQUEST;
+    if (0 == strncmp(received_string, "SERVER_PLAYER_MOVE_REQUEST", strlen("SERVER_PLAYER_MOVE_REQUEST") - 2)) return SERVER_PLAYER_MOVE_REQUEST;
+    if (0 == strncmp(received_string, "SERVER_GAME_RESULTS", strlen("SERVER_GAME_RESULTS") - 2)) return SERVER_GAME_RESULTS;
+    if (0 == strncmp(received_string, "SERVER_WIN", strlen("SERVER_WIN") - 2)) return SERVER_WIN;
+    if (0 == strncmp(received_string, "SERVER_DRAW", strlen("SERVER_DRAW") - 2)) return SERVER_DRAW;
+    if (0 == strncmp(received_string, "SERVER_NO_OPPONENTS", strlen("SERVER_NO_OPPONENTS") - 2)) return SERVER_NO_OPPONENTS;
+    if (0 == strncmp(received_string, "SERVER_OPPONENT_QUIT", strlen("SERVER_OPPONENT_QUIT") - 2)) return SERVER_OPPONENT_QUIT;
+    if (0 == strncmp(received_string, "SERVER_DENIED", strlen("SERVER_DENIED") - 2)) return SERVER_DENIED;
 
 // Upon failure
 return STATUS_CODE_FAILURE;
@@ -163,7 +163,7 @@ void OpponentNameLenInBytes(char received_string[], int* p_opponent_name_len)
     int i = 13;
     while (received_string[i] != '\n')
     {
-        *p_opponent_name_len++;
+        (*p_opponent_name_len)++;
         i++;
     }
     return;
@@ -215,48 +215,49 @@ char* GetStringFromClient(char user_input[])
 
 void DefineStringToSend(int game_state, char user_input[], char send_string[])
 {
-    char    client_request_str[] = "CLIENT_REQUEST:",
+    char    client_request[] = "CLIENT_REQUEST:",
         client_versus_str[] = "CLIENT_VERSUS\n",
-        client_setup_str[19] = "CLIENT_SETUP:",
-        client_player_move_str[25] = "CLIENT_PLAYER_MOVE:",
+        client_setup[] = "CLIENT_SETUP:", //19 max
+        client_player_move[] = "CLIENT_PLAYER_MOVE:", //25 max
         client_disconnect_str[] = "CLIENT_DISCONNECT\n";
 
     int i = 0,
-        client_request_i = strlen(client_request_str),
-        client_setup_i = strlen(client_setup_str),
-        client_player_move_i = strlen(client_player_move_str);
+        client_request_i = strlen(client_request),
+        client_setup_i = strlen(client_setup),
+        client_player_move_i = strlen(client_player_move);
 
     GetStringFromClient(user_input);
 
     switch (game_state)
     {
-    case I_START:
-    {
-        for (i = 0; i < client_request_i; i++) send_string[i] = client_request_str[i];
-        i = 0;
-        while (user_input[i] != '\0')
+        case I_START:
         {
-            send_string[i + client_request_i] = user_input[i];
-        }
-        send_string[i + client_request_i] = '\n';
-        send_string[i + client_request_i + 1] = '\0';
-        break;
-    }
-    case SERVER_MAIN_MENU:
-    {
-        while (atoi(user_input) < 1 || atoi(user_input) > 2)
-        {
-            printf("You need to choose either '1' or '2'. Other options are unacceptable\n");
-            GetStringFromClient(user_input);
-        }
-            if (user_input[0] = '1') strcpy_s(send_string, strlen(client_versus_str), client_versus_str);
-            if (user_input[0] = '2') strcpy_s(send_string, strlen(client_disconnect_str), client_disconnect_str);
+            for (i = 0; i < client_request_i; i++) send_string[i] = client_request[i];
+            i = 0;
+            while (user_input[i] != '\0')
+            {
+                send_string[i + client_request_i] = user_input[i];
+                i++;
+            }
+            send_string[i + client_request_i] = '\n';
+            send_string[i + client_request_i + 1] = '\0';
             break;
         }
+        case SERVER_MAIN_MENU:
+        {
+            while (atoi(user_input) < 1 || atoi(user_input) > 2)
+            {
+                printf("You need to choose either '1' or '2'. Other options are unacceptable\n");
+                GetStringFromClient(user_input);
+            }
+                if (user_input[0] == '1') strcpy_s(send_string, MAX_BYTES_CLIENT_MIGHT_SEND, client_versus_str);
+                if (user_input[0] == '2') strcpy_s(send_string, MAX_BYTES_CLIENT_MIGHT_SEND, client_disconnect_str);
+                break;
+            }
         case SERVER_SETUP_REQUEST:
         {
             i = 0;
-            for (i = 0; i < client_setup_i; i++) send_string[i] = client_setup_str[i];
+            for (i = 0; i < client_setup_i; i++) send_string[i] = client_setup[i];
             for (i = 0; i < 4; i++) send_string[i + client_setup_i] = user_input[i];
             send_string[i + client_setup_i] = '\n';
             send_string[i + client_setup_i + 1] = '\0';
@@ -265,7 +266,7 @@ void DefineStringToSend(int game_state, char user_input[], char send_string[])
         case SERVER_PLAYER_MOVE_REQUEST:
         {
             i = 0;
-            for (i = 0; i < client_player_move_i; i++) send_string[i] = client_player_move_str[i];
+            for (i = 0; i < client_player_move_i; i++) send_string[i] = client_player_move[i];
             for (i = 0; i < 4; i++) send_string[i + client_player_move_i] = user_input[i];
             send_string[i + client_player_move_i] = '\n';
             send_string[i + client_player_move_i + 1] = '\0';

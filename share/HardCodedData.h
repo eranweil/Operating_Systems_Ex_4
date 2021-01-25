@@ -37,8 +37,8 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define FALSE								    0
 
 // Sizes
-#define ARGS_REQUIRED_CLIENT                    4
-#define ARGS_REQUIRED_SERVER                    2
+#define ARGS_REQUIRED_CLIENT                    3
+#define ARGS_REQUIRED_SERVER                    1
 #define THREAD_WAIT_TIME_IN_MILLISECONDS		3000
 #define WAIT_FOR_SERVER_IN_MILLISECONDS         15000
 
@@ -49,10 +49,11 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define CLIENT_PLAYER_MOVE                      3
 #define CLIENT_DISCONNECT                       4
 
-// Personal client codes
+// special codes
 #define I_START                                 21
 #define I_QUIT                                  22
 #define I_FAIL                                  23
+#define OPPONENT_QUIT                           24
 
 // Server codes
 #define SERVER_MAIN_MENU                        0
@@ -78,7 +79,10 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define MAX_LOOPS                               3
 #define MAX_BYTES_SERVER_MIGHT_SEND             66
 #define MAX_BYTES_CLIENT_MIGHT_SEND             27         
-#define THREAD_WAIT_TIME                        15000
+#define THREAD_WAIT_TIME                        1000000
+#define WAIT_FOR_OTHER_PLAYER_IN_MILLISECONDS   15000
+#define POLL_EVENT_STATUS                       0
+
 
 
 // Structures
@@ -94,10 +98,19 @@ struct Thread
     SOCKET* ThreadInputs;
     HANDLE* p_mutex_file;
     HANDLE* p_event;
+    HANDLE* file_handle;
     char* tasks_file_name;
     int thread_id;
     int* stage_of_game;
+    int* p_number_of_clients_connected;
 };
 typedef struct Thread THREAD;
+
+struct TwoPlayerThread
+{
+    HANDLE* p_event;
+    int* p_number_of_clients_connected;
+};
+typedef struct TwoPlayerThread TWO_PLAYER_THREAD;
 
 

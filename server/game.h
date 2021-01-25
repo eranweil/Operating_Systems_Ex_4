@@ -18,7 +18,6 @@ bulls & cows functions
 // ----------------------PROJECT INCLUDES--------------------- //
 //-------------------------------------------------------------//
 
-#include "Lock.h"
 #include "threadManager.h"
 #include "HardCodedData.h"
 
