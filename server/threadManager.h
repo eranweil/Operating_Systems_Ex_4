@@ -60,7 +60,7 @@ PARAMETERS - all threads, sockets and handles
 
 RETURN - success code upon success or failure code otherwise
 	--------------------------------------------------------------------------------------------*/
-int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_players, HANDLE TwoPlayerEventThread, HANDLE ExitThread, HANDLE ExitEvent, HANDLE file_handle, HANDLE mutex_file, HANDLE event_player_2, SOCKET MainSocket, char game_file_name[]);
+int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE* event_two_players, HANDLE* TwoPlayerEventThread, HANDLE* ExitThread, HANDLE* ExitEvent, HANDLE* file_handle, HANDLE* mutex_file, HANDLE* event_player_2, SOCKET* MainSocket, char game_file_name[]);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - check what the client sent

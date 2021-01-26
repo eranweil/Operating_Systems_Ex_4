@@ -43,7 +43,7 @@ PARAMETERS - all threads, sockets and handles
 
 RETURN - success code upon success or failure code otherwise
     --------------------------------------------------------------------------------------------*/
-int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_players, HANDLE TwoPlayerEventThread, HANDLE ExitThread, HANDLE ExitEvent, HANDLE file_handle, HANDLE mutex_file, HANDLE event_player_2, SOCKET MainSocket, char game_file_name[]);
+int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE* event_two_players, HANDLE* TwoPlayerEventThread, HANDLE* ExitThread, HANDLE* ExitEvent, HANDLE* file_handle, HANDLE* mutex_file, HANDLE* event_player_2, SOCKET* MainSocket, char game_file_name[]);
 
 /*--------------------------------------------------------------------------------------------
 DESCRIPTION - check what the client sent
@@ -139,7 +139,7 @@ void WaitError(DWORD wait_res)
 }
 
 
-int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_players, HANDLE TwoPlayerEventThread, HANDLE ExitThread, HANDLE ExitEvent, HANDLE file_handle, HANDLE mutex_file, HANDLE event_player_2, SOCKET MainSocket, char game_file_name[])
+int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE* event_two_players, HANDLE* TwoPlayerEventThread, HANDLE* ExitThread, HANDLE* ExitEvent, HANDLE* file_handle, HANDLE* mutex_file, HANDLE* event_player_2, SOCKET* MainSocket, char game_file_name[])
 {
     int i = 0;
     DWORD dwEvent;
@@ -150,38 +150,37 @@ int FreeAll(HANDLE ThreadHandles[], SOCKET ThreadInputs[], HANDLE event_two_play
     if (WAIT_OBJECT_0 == dwEvent)
     {
         // Free the threads which were dispatched
-        for (i = 0; i < NUM_OF_WORKER_THREADS; i++)
-        {
-            CloseHandle(ThreadHandles[i]);
-            closesocket(ThreadInputs[i]);
-            printf("freed Thread number: %d\n", i + 1);
-        }
+		for (i = 0; i < NUM_OF_WORKER_THREADS; i++)
+		{
+			if (ThreadHandles[i] != NULL)
+			{
+				CloseHandle(ThreadHandles[i]);
+				closesocket(ThreadInputs[i]);
+				printf("freed Thread number: %d\n", i + 1);
+			}
+		}
     }
+	if (FALSE == (CloseHandle(*event_two_players))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*TwoPlayerEventThread))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*ExitEvent))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*ExitThread))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*event_player_2))) return STATUS_CODE_FAILURE;
+	if (NULL != *file_handle)
+	{
+		if (FALSE == (CloseHandle(*file_handle))) return STATUS_CODE_FAILURE;
+		//if (FALSE == (DeleteFileA(game_file_name))) return STATUS_CODE_FAILURE;
+	}	
+	if (NULL != *mutex_file)
+	{
+		if (FALSE == (CloseHandle(*mutex_file))) return STATUS_CODE_FAILURE;
+	}
 
-    else
-    {
-        // Print Error message
-        //WaitError(dwEvent);
-        // Free the threads which were dispatched, because some might have been
-        for (i = 0; i < 2; i++)
-        {
-            if (ThreadHandles[i] != NULL)
-            {
-				TerminateThread(ThreadHandles[i], 0x555);
-                closesocket(ThreadInputs[i]);
-                printf("freed Thread number: %d\n", i + 1);
-            }
-        }
-    }
-	if (FALSE == (CloseHandle(event_two_players))) return STATUS_CODE_FAILURE;
-	if (FALSE == (CloseHandle(TwoPlayerEventThread))) return STATUS_CODE_FAILURE;
-	if (FALSE == (CloseHandle(ExitEvent))) return STATUS_CODE_FAILURE;
-	if (FALSE == (CloseHandle(ExitThread))) return STATUS_CODE_FAILURE;
-	if (FALSE == (CloseHandle(event_player_2))) return STATUS_CODE_FAILURE;
-	if (FALSE == (CloseHandle(file_handle))) return STATUS_CODE_FAILURE;
-	if (FALSE == (DeleteFileA(game_file_name))) return STATUS_CODE_FAILURE;
-	if (FALSE == (CloseHandle(mutex_file))) return STATUS_CODE_FAILURE;
-	if (0 == (closesocket(MainSocket))) return STATUS_CODE_FAILURE;
+	if (closesocket(*MainSocket) == SOCKET_ERROR)
+	{
+		printf("Failed to close MainSocket, error %ld. Ending program\n", WSAGetLastError());
+		if (WSACleanup() == SOCKET_ERROR) printf("Failed to close Winsocket, error %ld. Ending program.\n", WSAGetLastError());
+		return STATUS_CODE_FAILURE;
+	}
 
 	return SUCCESS_CODE;
 }
@@ -367,7 +366,9 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 		server_win_str[38],
 		server_draw_str[] = "SERVER_DRAW\n",
 		server_no_opponents_str[] = "SERVER_NO_OPPONENTS\n",
-		server_opponent_quit_str[] = "SERVER_OPPONENT_QUIT\n";
+		server_opponent_quit_str[] = "SERVER_OPPONENT_QUIT\n",
+		server_denied_str[] = "SERVER_DENIED\n";
+
 
 	THREAD* thread_params = (THREAD*)lpParam;
 	printf("My thread ID is %d\n", thread_params->thread_id);
@@ -381,6 +382,12 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 
 	while (game_state != CLIENT_DISCONNECT)
 	{
+		if (WAIT_OBJECT_0 == WaitForSingleObject(*thread_params->p_ExitEvent, 0))
+		{
+			if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_denied_str))) return STATUS_CODE_FAILURE;
+			(*thread_params->p_number_of_clients_connected)--;
+			return SUCCESS_CODE;
+		}
 		switch (game_state)
 		{
 			case I_START:

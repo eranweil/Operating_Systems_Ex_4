@@ -107,14 +107,15 @@ typedef struct lock LOCK;
 
 struct Thread
 {
-    SOCKET* ThreadInputs;
-    HANDLE* p_mutex_file;
-    HANDLE* p_event;
-    HANDLE* file_handle;
-    HANDLE* event_player_2;
-    char* tasks_file_name;
-    int thread_id;
-    int* p_number_of_clients_connected;
+	SOCKET* ThreadInputs;
+	HANDLE* p_mutex_file;
+	HANDLE* p_event;
+	HANDLE* file_handle;
+	HANDLE* event_player_2;
+	HANDLE* p_ExitEvent;
+	char* tasks_file_name;
+	int thread_id;
+	int* p_number_of_clients_connected;
 };
 typedef struct Thread THREAD;
 

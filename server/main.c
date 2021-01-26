@@ -220,7 +220,7 @@ int CreateEventsAndEventThreads(HANDLE* event_two_players, HANDLE* ExitEvent, HA
 		NULL,
 		0,
 		ExitMonitor,
-		&ExitEvent,
+		ExitEvent,
 		0,
 		&dwExitThreadId
 	)))
@@ -239,12 +239,14 @@ DESCRIPTION - A small function to free the events and threads in case of errors,
 	--------------------------------------------------------------------------------------------*/
 int FreeEventAndThreadHandles(HANDLE* event_two_players, HANDLE* ExitEvent, HANDLE* event_player_2, HANDLE* TwoPlayerEventThread, HANDLE* ExitThread)
 {
-	CloseHandle(*event_two_players);
-	CloseHandle(*ExitEvent);
-	CloseHandle(*event_player_2);
-	CloseHandle(*TwoPlayerEventThread);
-	CloseHandle(*ExitThread);
+	if (FALSE == (CloseHandle(*event_two_players))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*ExitEvent))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*event_player_2))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*TwoPlayerEventThread))) return STATUS_CODE_FAILURE;
+	if (FALSE == (CloseHandle(*ExitThread))) return STATUS_CODE_FAILURE;
+	return SUCCESS_CODE;
 }
+
 
 int main(int argc, char** argv)
 {
@@ -374,6 +376,7 @@ int main(int argc, char** argv)
 				pData_0->p_event = &event_two_players;
 				pData_0->file_handle = &file_handle;
 				pData_0->event_player_2 = &event_player_2;
+				pData_0->p_ExitEvent = &ExitEvent;
 				pData_0->tasks_file_name = game_file_name;
 				pData_0->thread_id = i;
 				pData_0->p_number_of_clients_connected = p_number_of_clients_connected;
@@ -395,6 +398,7 @@ int main(int argc, char** argv)
 				pData_1->p_event = &event_two_players;
 				pData_1->file_handle = &file_handle;
 				pData_1->event_player_2 = &event_player_2;
+				pData_1->p_ExitEvent = &ExitEvent;
 				pData_1->tasks_file_name = game_file_name;
 				pData_1->thread_id = i;
 				pData_1->p_number_of_clients_connected = p_number_of_clients_connected;
@@ -422,7 +426,7 @@ int main(int argc, char** argv)
 	} 	//(while no exit)
 
 		// escorting all handles, sockets and threads for exit
-	if (STATUS_CODE_FAILURE == (FreeAll(ThreadHandles, ThreadInputs, event_two_players, TwoPlayerEventThread, ExitThread, ExitEvent, file_handle, mutex_file, event_player_2, MainSocket, game_file_name)))
+	if (STATUS_CODE_FAILURE == (FreeAll(ThreadHandles, ThreadInputs, &event_two_players, &TwoPlayerEventThread, &ExitThread, &ExitEvent, &file_handle, &mutex_file, &event_player_2, &MainSocket, game_file_name)))
 	{
 		return STATUS_CODE_FAILURE;
 	}
