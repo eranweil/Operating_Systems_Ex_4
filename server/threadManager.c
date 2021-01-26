@@ -385,6 +385,7 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 		if (WAIT_OBJECT_0 == WaitForSingleObject(*thread_params->p_ExitEvent, 0))
 		{
 			if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_denied_str))) return STATUS_CODE_FAILURE;
+
 			(*thread_params->p_number_of_clients_connected)--;
 			return SUCCESS_CODE;
 		}
@@ -395,7 +396,7 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				// Only thread[0] opens the file
 				if (thread_params->thread_id == 0)
 				{
-					if (NULL == (*thread_params->p_mutex_file = CreateMutex(NULL, TRUE, NULL))) CloseHandle(thread_params->p_mutex_file);  /// add a return
+					if (NULL == (*thread_params->p_mutex_file = CreateMutex(NULL, TRUE, NULL))) return STATUS_CODE_FAILURE;
 				}
 				//Server approved
 				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_approved_str))) return STATUS_CODE_FAILURE;
@@ -473,11 +474,11 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 					server_invite_str[i + 1 + strlen(server_invite)] = '\0';
 
 					// Server invite
-					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_invite_str))) return STATUS_CODE_FAILURE;
-					// Server Setup request
 					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
+					// Server Setup request
 					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_setup_request_str))) return STATUS_CODE_FAILURE;
+					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 					if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
 					printf("%s", received_string);
 					// Copy the clients number including the NULL sign
@@ -494,8 +495,8 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 			}
 			case CLIENT_SETUP:
 			{
-				if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_player_move_request_str))) return STATUS_CODE_FAILURE;
+				if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
 				printf("\n");
 				for (i = 0; i < 5; i++) client_guess[i] = received_string[i + 19];
@@ -522,16 +523,19 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 					server_win_str[i + strlen(server_win) + 1] = '\0';
 
 					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_win_str))) return STATUS_CODE_FAILURE;
+					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 					game_state = SPECIAL_CLIENT_REQUEST;
 				}
 				else if (game_result == GAME_DRAW)
 				{
 					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_draw_str))) return STATUS_CODE_FAILURE;
+					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 					game_state = SPECIAL_CLIENT_REQUEST;
 				}
 				else
 				{
 					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_game_results_str))) return STATUS_CODE_FAILURE;
+					if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 					game_state = CLIENT_SETUP;
 				}
 				break;
@@ -539,6 +543,7 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 			case OPPONENT_QUIT:
 			{
 				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_opponent_quit_str))) return STATUS_CODE_FAILURE;
+				if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 				game_state = SPECIAL_CLIENT_REQUEST;
 				break;
 			}
