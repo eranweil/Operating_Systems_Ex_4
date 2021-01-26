@@ -159,7 +159,7 @@ void BreakDownGameResultsString(char received_string[], char bulls[], char cows[
 }
 
 
-void GetWinnersNameAndOpponentsGuess(char received_string[], char winners_name[], char opponent_guess[])        //what?!?!?!
+void GetWinnersNameAndOpponentsGuess(char received_string[], char winners_name[], char opponent_guess[])
 {
     int i = 0, winners_name_len = 0;
 
@@ -199,7 +199,7 @@ void DefineStringToSend(int* p_game_state, char user_input[], char send_string[]
 
     switch (*p_game_state)
     {
-        case I_START:
+        case SERVER_APPROVED:
         {
             for (i = 0; i < client_request_i; i++) send_string[i] = client_request[i];
             i = 0;
@@ -258,13 +258,7 @@ int GameState(SOCKET* m_socket, SOCKADDR_IN* p_clientService, int* p_game_state,
     {
     case I_START:
     {
-        printf("Connected to server on %s:%s\nType in your name:\n", server_ip, server_port);
-        DefineStringToSend(p_game_state, user_input, send_string);
-        if (STATUS_CODE_FAILURE == (SendData(*m_socket, send_string)))
-        {
-            *p_game_state = I_FAIL;
-            break;
-        }
+        printf("Connected to server on %s:%s\n", server_ip, server_port);
         if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
         {
             *p_game_state = I_FAIL;
@@ -276,17 +270,25 @@ int GameState(SOCKET* m_socket, SOCKADDR_IN* p_clientService, int* p_game_state,
     }
     case SERVER_APPROVED:
     {
+        printf("Type in your name:\n");
+        DefineStringToSend(p_game_state, user_input, send_string);
+        if (STATUS_CODE_FAILURE == (SendData(*m_socket, send_string)))
+        {
+            *p_game_state = I_FAIL;
+            break;
+        }
         if (STATUS_CODE_FAILURE == (RecvData(*m_socket, received_string)))
         {
             *p_game_state = I_FAIL;
             break;
         }
+        *p_game_state = WhatWasReceived(received_string);
         printf("\n");
-        *p_game_state = SERVER_MAIN_MENU;
         break;
     }
     case SERVER_MAIN_MENU:
     {
+        *p_opponent_name_len = 0;
         printf("Choose what to do next:\n1. Play against another client\n2. Quit\n");
         DefineStringToSend(p_game_state, user_input, send_string);
         if (STATUS_CODE_FAILURE == (SendData(*m_socket, send_string)))
@@ -312,7 +314,7 @@ int GameState(SOCKET* m_socket, SOCKADDR_IN* p_clientService, int* p_game_state,
             *p_game_state = I_FAIL;
             break;
         }
-        printf("%s", received_string);
+        printf("\n");
         *p_game_state = SERVER_MAIN_MENU;
         break;
     }

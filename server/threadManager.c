@@ -217,7 +217,9 @@ int ReadFromFile(HANDLE file_handle, char string[], int offset)
 		}
 
 		if (curr_char == '\r') string[i] = '\0';
-		else string[i] = curr_char;																					//Gotta fix here
+
+
+		else string[i] = curr_char;
 		i++;
 	}
 
@@ -388,10 +390,10 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				{
 					if (NULL == (*thread_params->p_mutex_file = CreateMutex(NULL, TRUE, NULL))) CloseHandle(thread_params->p_mutex_file);  /// add a return
 				}
-				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
-				printf("%s", received_string);
 				//Server approved
 				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_approved_str))) return STATUS_CODE_FAILURE;
+				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
+				printf("\n");
 				GetClientName(received_string, client_name);
 				game_state = WhatWasReceived(received_string);
 				break;
@@ -402,18 +404,19 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_main_menu_str))) return STATUS_CODE_FAILURE;
 				//wait forever
 				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
-				printf("%s", received_string);
+				printf("\n");
 				game_state = WhatWasReceived(received_string);
 				break;
 			}			
 			case SPECIAL_CLIENT_REQUEST:
 			{
+				Sleep(2000);
 				//Server Main Menu
 				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_main_menu_str))) return STATUS_CODE_FAILURE;
 				//wait forever
 				(*thread_params->p_number_of_clients_connected)--;
 				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
-				printf("%s", received_string);
+				printf("\n");
 				game_state = WhatWasReceived(received_string);
 				break;
 			}
@@ -487,7 +490,7 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				if (FALSE == PollTwoPlayers(thread_params, POLL_EVENT_STATUS, &game_state)) break;
 				if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_player_move_request_str))) return STATUS_CODE_FAILURE;
 				if (STATUS_CODE_FAILURE == (RecvData((thread_params->ThreadInputs)[thread_params->thread_id], received_string))) return STATUS_CODE_FAILURE;
-				printf("%s", received_string);
+				printf("\n");
 				for (i = 0; i < 5; i++) client_guess[i] = received_string[i + 19];
 				client_guess[4] = '\r';
 				client_guess[5] = '\n';
@@ -513,7 +516,6 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 
 					if (STATUS_CODE_FAILURE == (SendData((thread_params->ThreadInputs)[thread_params->thread_id], server_win_str))) return STATUS_CODE_FAILURE;
 					game_state = SPECIAL_CLIENT_REQUEST;
-				
 				}
 				else if (game_result == GAME_DRAW)
 				{
@@ -534,16 +536,6 @@ DWORD WINAPI ServiceThread(LPVOID lpParam)
 				break;
 			}
 		}
-		if (game_state == CLIENT_DISCONNECT)
-		{
-			//(*thread_params->p_number_of_clients_connected)--;
-			if (thread_params->thread_id == 0)														///What to do ???
-			{
-				//close mutex
-				//close file
-			}
-		}
-		continue;
 	}
 	return SUCCESS_CODE;
 }

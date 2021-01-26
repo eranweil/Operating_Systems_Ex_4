@@ -38,6 +38,8 @@ Contains specific measured sizes, exit codes and structures of the project.
 #define ERROR_CODE_WSO_WAIT_ABANDONED		   -7
 #define ERROR_CODE_WSO_WAIT_TIMEOUT			   -8
 #define ERROR_CODE_WSO_WAIT_FAILED			   -9
+#define ERROR_WSA   			               -10
+
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 
